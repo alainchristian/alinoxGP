@@ -1,0 +1,122 @@
+/**
+ * Minimal i18n layer (English first). Navigation labels and API error messages go through `t()` so
+ * further languages can be added without touching components. Page copy still lives in components and
+ * is to be extracted as languages are introduced (tracked in DEVELOPMENT_ROADMAP.md).
+ */
+const en = {
+  'nav.overview': 'Overview',
+  'nav.dashboard': 'Dashboard',
+  'nav.settings': 'Settings',
+  'nav.organization': 'Organization',
+  'nav.users': 'Users & Permissions',
+  'nav.account': 'My account',
+  'nav.staff': 'Staff & permissions',
+  'nav.platform': 'Platform',
+  'nav.fleet': 'Fleet',
+  'nav.live': 'Live tracking',
+  'nav.monitor': 'Pipeline monitor',
+
+  'error.generic': 'Something went wrong. Please try again.',
+  'error.network': 'Cannot reach the server. Check your connection and try again.',
+  'error.INVALID_CREDENTIALS': 'Incorrect email or password.',
+  'error.EMAIL_NOT_VERIFIED': 'Verify your email address before signing in.',
+  'error.ACCOUNT_DISABLED': 'This account is disabled. Contact support.',
+  'error.ACCOUNT_TEMPORARILY_LOCKED': 'Too many failed attempts. Try again in a few minutes.',
+  'error.TOTP_REQUIRED': 'Enter the code from your authenticator app.',
+  'error.INVALID_TOTP': 'That authenticator code is not valid.',
+  'error.RATE_LIMITED': 'Too many requests. Please wait a moment and try again.',
+  'error.INVALID_OR_EXPIRED_TOKEN': 'This link is invalid or has expired. Request a new one.',
+  'error.STEP_UP_FAILED': 'Confirmation failed. Check your password.',
+  'error.PERMISSION_DENIED': 'You do not have permission to do this.',
+  'error.ORGANIZATION_NOT_FOUND': 'That organization was not found.',
+  'error.ORGANIZATION_SUSPENDED': 'This organization is suspended. Contact support.',
+  'error.ALREADY_MEMBER': 'This person is already a member of the organization.',
+  'error.ROLE_NOT_ASSIGNABLE': 'This role cannot be assigned here.',
+  'error.ROLE_EXCEEDS_YOUR_PERMISSIONS': 'You cannot grant a role more powerful than your own.',
+  'error.OWNER_PROTECTED': 'The organization owner cannot be changed or removed.',
+  'error.CANNOT_MODIFY_SELF': 'You cannot change your own membership.',
+  'error.INVITATION_NOT_FOUND': 'This invitation is invalid or has expired.',
+  'error.ACCOUNT_EXISTS_LOGIN_REQUIRED': 'An account with this email already exists. Sign in to accept the invitation.',
+  'error.COUNTRY_NOT_SUPPORTED': 'This country is not available yet.',
+  'error.VALIDATION_FAILED': 'Please correct the highlighted fields.',
+  'error.VEHICLE_NOT_FOUND': 'That vehicle was not found. It may have been deleted.',
+  'error.VEHICLE_REGISTRATION_TAKEN': 'A vehicle with this registration number already exists.',
+  'error.VEHICLE_VIN_TAKEN': 'A vehicle with this VIN already exists.',
+  'error.VEHICLE_HAS_DEVICE': 'Remove the tracker from this vehicle before deleting it.',
+  'error.VEHICLE_HAS_DRIVER': 'This vehicle has an assigned driver. Unassign the driver first.',
+  'error.VEHICLE_HAS_NO_DRIVER': 'This vehicle has no assigned driver.',
+  'error.VEHICLE_DOCUMENT_NOT_FOUND': 'That document record was not found.',
+  'error.CATEGORY_NOT_FOUND': 'That category was not found.',
+  'error.CATEGORY_NAME_TAKEN': 'A category with this name already exists.',
+  'error.CATEGORY_IN_USE': 'Move or remove the vehicles in this category first.',
+  'error.DRIVER_NOT_FOUND': 'That driver was not found. They may have been deleted.',
+  'error.DRIVER_LICENSE_TAKEN': 'A driver with this licence number already exists.',
+  'error.DRIVER_INACTIVE': 'An inactive driver cannot be assigned to a vehicle.',
+  'error.DRIVER_ASSIGNED': 'This driver is assigned to a vehicle. Unassign them first.',
+  'error.DRIVER_ALREADY_ASSIGNED': 'This driver is already assigned to another vehicle.',
+  'error.DRIVER_ASSIGNMENT_CONFLICT': 'Someone else just changed this assignment. Reload and try again.',
+  'nav.devices': 'Devices',
+  'nav.catalogue': 'Device catalogue',
+  'nav.adminDevices': 'Device diagnostics',
+  'nav.support': 'Support requests',
+  'nav.consent': 'Tracking notices',
+  'nav.deviceTools': 'Devices',
+  'error.DEVICE_NOT_FOUND': 'That device was not found. It may belong to another organization.',
+  'error.DEVICE_IDENTIFIER_UNAVAILABLE': 'This identifier cannot be registered. Check it, or contact support.',
+  'error.SIMULATED_DEVICE_NOT_ALLOWED': 'Simulated devices can only be registered in a sandbox organization.',
+  'error.DEVICE_ALREADY_ASSIGNED': 'This device is already installed on a vehicle. Remove it first.',
+  'error.VEHICLE_ALREADY_HAS_DEVICE': 'This vehicle already has a tracker. Remove it first.',
+  'error.DEVICE_NOT_ASSIGNED': 'This device is not installed on a vehicle.',
+  'error.ASSIGNMENT_CONFLICT': 'Someone else just changed this. Reload and try again.',
+  'error.DEVICE_NOT_CONFIGURABLE': 'This device cannot be moved to the next step from its current status.',
+  'error.VARIANT_NOT_FOUND': 'Choose a device model from the list.',
+  'error.VARIANT_IDENTIFIER_MISMATCH': 'This identifier does not fit that model (simulated identifiers start with SIM- and only fit the simulator profile).',
+  'error.CONSENT_REQUIRED': 'Read and acknowledge the tracking notice first.',
+  'error.CONSENT_NOTICE_NOT_DRAFT': 'Only a draft notice can be published.',
+  'error.CONSENT_NOTICE_NOT_FOUND': 'That notice was not found.',
+  'error.INVALID_TRANSITION': 'The device cannot be moved to that status from its current one.',
+  'error.TRANSITION_CONFLICT': 'The device status changed at the same time. Reload and try again.',
+  'error.VERIFICATION_REQUIRED': 'Record a test (who, when, firmware, procedure, evidence) before marking a variant as verified.',
+  'error.SIMULATOR_PROFILE_NOT_VERIFIABLE': 'A simulator profile is not a physical device and cannot be verified.',
+  'error.IMMOBILIZATION_NEEDS_VERIFIED_VARIANT': 'Remote immobilization can only be marked supported on a verified variant.',
+  'error.MANUFACTURER_NAME_TAKEN': 'A manufacturer with this name already exists.',
+  'error.MODEL_NAME_TAKEN': 'This manufacturer already has a model with this name.',
+  'error.CATALOGUE_MODEL_NOT_FOUND': 'That model was not found.',
+  'error.CATALOGUE_VARIANT_NOT_FOUND': 'That variant was not found.',
+  'error.MANUFACTURER_NOT_FOUND': 'That manufacturer was not found.',
+  'error.UNKNOWN_CAPABILITY': 'That capability is not known.',
+  'error.SUPPORT_REQUEST_NOT_FOUND': 'That request was not found.',
+  'error.SUPPORT_REQUEST_CLOSED': 'This request is already closed.',
+  'nav.vehicles': 'Vehicles',
+  'nav.drivers': 'Drivers',
+} as const;
+
+export type MessageKey = keyof typeof en;
+
+export function t(key: MessageKey): string {
+  return en[key];
+}
+
+/** Translate an API error `code`; falls back to a generic message (never to raw server text). */
+export function errorMessage(code: string | undefined, fallback?: string): string {
+  const key = `error.${code ?? ''}` as MessageKey;
+  return (code && en[key]) || fallback || en['error.generic'];
+}
+
+export const ROLE_LABELS: Record<string, string> = {
+  ORG_OWNER: 'Owner',
+  ORG_ADMIN: 'Administrator',
+  FLEET_MANAGER: 'Fleet Manager',
+  SECURITY_MANAGER: 'Security Manager',
+  DRIVER: 'Driver',
+  VIEWER: 'Read-only Viewer',
+  RESELLER_ADMIN: 'Reseller Administrator',
+  RESELLER_STAFF: 'Reseller Staff',
+  PLATFORM_SUPER_ADMIN: 'Super Administrator',
+  PLATFORM_OPERATIONS_ADMIN: 'Operations Administrator',
+  PLATFORM_TECHNICAL_ADMIN: 'Technical Administrator',
+  PLATFORM_FINANCE_ADMIN: 'Finance Administrator',
+  PLATFORM_SUPPORT_ADMIN: 'Support Administrator',
+};
+
+export const roleLabel = (key: string) => ROLE_LABELS[key] ?? key;

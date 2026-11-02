@@ -1,0 +1,54 @@
+[
+  {
+    "id": 16,
+    "attributes": {},
+    "deviceId": 12,
+    "type": "ignitionOff",
+    "eventTime": "2026-11-01T09:43:42.000+00:00",
+    "positionId": 52,
+    "geofenceId": 0,
+    "maintenanceId": 0
+  },
+  {
+    "id": 17,
+    "attributes": {},
+    "deviceId": 12,
+    "type": "deviceMoving",
+    "eventTime": "2026-11-01T09:43:47.000+00:00",
+    "positionId": 53,
+    "geofenceId": 0,
+    "maintenanceId": 0
+  },
+  {
+    "id": 19,
+    "attributes": {},
+    "deviceId": 12,
+    "type": "geofenceEnter",
+    "eventTime": "2026-11-01T09:46:09.000+00:00",
+    "positionId": 59,
+    "geofenceId": 4,
+    "maintenanceId": 0
+  },
+  {
+    "id": 18,
+    "attributes": {
+      "id": 4
+    },
+    "deviceId": 12,
+    "type": "queuedCommandSent",
+    "eventTime": "2026-11-01T09:46:09.964+00:00",
+    "positionId": 0,
+    "geofenceId": 0,
+    "maintenanceId": 0
+  },
+  {
+    "id": 20,
+    "attributes": {},
+    "deviceId": 12,
+    "type": "geofenceExit",
+    "eventTime": "2026-11-01T09:46:12.000+00:00",
+    "positionId": 60,
+    "geofenceId": 4,
+    "maintenanceId": 0
+  }
+]

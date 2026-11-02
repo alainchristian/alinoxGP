@@ -1,0 +1,71 @@
+# TEST infrastructure: a separate compose project (`gps-test`) with its own PostgreSQL, Redis and Traccar on their own
+# ports and volumes, so automated tests can never touch development data (and development data can never skew a test).
+# `pnpm test:reset` wipes the volumes and rebuilds it; every e2e run also wipes tenant data and engine devices at start
+# (apps/api/test/global-setup.ts refuses to do that against anything but this stack).
+# Dev-only credentials. Ports: Postgres 54339, Redis 63809, Traccar REST 58092, OsmAnd 55065 (dev uses 54329/63799/58082/55055).
+name: gps-test
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev
+      GPS_OWNER_PASSWORD: gps_owner_dev
+      GPS_APP_PASSWORD: gps_app_dev
+      GPS_SYSTEM_PASSWORD: gps_system_dev
+      TRACCAR_DB_PASSWORD: traccar_dev
+    ports:
+      - '127.0.0.1:54339:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports:
+      - '127.0.0.1:63809:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Same pinned engine and settings as development (docs/GPS_INTEGRATION.md): tests must run against what production runs.
+  traccar:
+    image: traccar/traccar:6.16.0-debian
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONFIG_USE_ENVIRONMENT_VARIABLES: 'true'
+      DATABASE_DRIVER: org.postgresql.Driver
+      DATABASE_URL: jdbc:postgresql://postgres:5432/traccar
+      DATABASE_USER: traccar
+      DATABASE_PASSWORD: traccar_dev
+      DATABASE_REGISTER_UNKNOWN: 'false'
+      GEOCODER_ENABLE: 'false'
+      FILTER_ENABLE: 'true'
+      FILTER_FUTURE: '600'
+    ports:
+      - '127.0.0.1:58092:8082'
+      - '127.0.0.1:55065:5055'
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - 'exec 3<>/dev/tcp/127.0.0.1/8082 && printf "GET /api/server HTTP/1.0\r\n\r\n" >&3 && head -1 <&3 | grep -q "200 OK"'
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 20s
+
+volumes:
+  pgdata:

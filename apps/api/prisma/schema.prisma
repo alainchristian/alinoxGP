@@ -1,0 +1,847 @@
+// GPS platform — application database schema (M1: identity, tenancy, access control, audit).
+// Raw SQL that Prisma cannot express (RLS, append-only triggers, single-owner trigger, grants)
+// lives in prisma/migrations/*/migration.sql with explanatory comments. See docs/adr/0003.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL") // runtime: gps_app (RLS applies)
+  directUrl         = env("DATABASE_URL_MIGRATE") // prisma CLI / migrations: gps_owner
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum OrganizationType {
+  PLATFORM
+  RESELLER
+  CUSTOMER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MemberStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum RoleScope {
+  PLATFORM
+  ORGANIZATION
+  RESELLER
+}
+
+enum EmailTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+// ---------------------------------------------------------------- reference data (global)
+
+model Country {
+  code            String  @id @db.Char(2)
+  name            String
+  dialCode        String  @map("dial_code")
+  defaultCurrency String  @map("default_currency") @db.Char(3)
+  defaultTimezone String  @map("default_timezone")
+  enabled         Boolean @default(true)
+
+  @@map("countries")
+}
+
+model Currency {
+  code         String @id @db.Char(3)
+  name         String
+  symbol       String
+  minorUnitExp Int    @map("minor_unit_exp")
+
+  @@map("currencies")
+}
+
+// ---------------------------------------------------------------- identity (global, no tenant column)
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique // stored lower-case
+  passwordHash    String     @map("password_hash")
+  fullName        String     @map("full_name")
+  phoneE164       String?    @map("phone_e164")
+  locale          String     @default("en")
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz
+  totpSecretEnc   String?    @map("totp_secret_enc")
+  totpEnabledAt   DateTime?  @map("totp_enabled_at") @db.Timestamptz
+  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions      Session[]
+  emailTokens   EmailToken[]
+  recoveryCodes TotpRecoveryCode[]
+  memberships   OrganizationMember[]
+
+  @@map("users")
+}
+
+// One row per login (a "session family"). Refresh tokens rotate inside it (ADR-0002).
+model Session {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  userAgent     String?   @map("user_agent")
+  ip            String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt    DateTime  @default(now()) @map("last_used_at") @db.Timestamptz
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz
+  stepUpAt      DateTime? @map("step_up_at") @db.Timestamptz
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz
+  revokedReason String?   @map("revoked_reason")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  sessionId String    @map("session_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+model EmailToken {
+  id        String            @id @default(uuid()) @db.Uuid
+  userId    String            @map("user_id") @db.Uuid
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique @map("token_hash")
+  expiresAt DateTime          @map("expires_at") @db.Timestamptz
+  usedAt    DateTime?         @map("used_at") @db.Timestamptz
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("email_tokens")
+}
+
+model TotpRecoveryCode {
+  id       String    @id @default(uuid()) @db.Uuid
+  userId   String    @map("user_id") @db.Uuid
+  codeHash String    @map("code_hash")
+  usedAt   DateTime? @map("used_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("totp_recovery_codes")
+}
+
+// ---------------------------------------------------------------- tenancy
+
+model Organization {
+  id                   String             @id @default(uuid()) @db.Uuid
+  type                 OrganizationType   @default(CUSTOMER)
+  parentOrganizationId String?            @map("parent_organization_id") @db.Uuid
+  name                 String
+  legalName            String?            @map("legal_name")
+  countryCode          String             @map("country_code") @db.Char(2)
+  timezone             String
+  currencyCode         String             @map("currency_code") @db.Char(3)
+  locale               String             @default("en")
+  status               OrganizationStatus @default(ACTIVE)
+  isSandbox            Boolean            @default(false) @map("is_sandbox")
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  parent            Organization?        @relation("OrgTree", fields: [parentOrganizationId], references: [id])
+  children          Organization[]       @relation("OrgTree")
+  members           OrganizationMember[]
+  invitations       Invitation[]
+  vehicles          Vehicle[]
+  vehicleCategories VehicleCategory[]
+  drivers           Driver[]
+  ownedDevices      GpsDevice[]          @relation("DeviceOwner")
+  operatedDevices   GpsDevice[]          @relation("DeviceOperator")
+  alertRules        AlertRule[]
+
+  @@index([parentOrganizationId])
+  @@map("organizations")
+}
+
+// [T] tenant-owned: RLS enforced (see migration).
+model OrganizationMember {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  status         MemberStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles        MemberRole[]
+
+  @@unique([organizationId, userId])
+  @@unique([organizationId, id]) // target of composite FKs
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Role {
+  id          String    @id @default(uuid()) @db.Uuid
+  scope       RoleScope
+  key         String
+  name        String
+  description String?
+  isSystem    Boolean   @default(true) @map("is_system")
+
+  permissions RolePermission[]
+  memberRoles MemberRole[]
+  invitations Invitation[]
+
+  @@unique([scope, key])
+  @@unique([key])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  key         String  @unique
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// [T] — composite FK (organization_id, member_id) makes cross-tenant role grants impossible.
+model MemberRole {
+  organizationId String   @map("organization_id") @db.Uuid
+  memberId       String   @map("member_id") @db.Uuid
+  roleId         String   @map("role_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  member OrganizationMember @relation(fields: [organizationId, memberId], references: [organizationId, id], onDelete: Cascade)
+  role   Role               @relation(fields: [roleId], references: [id])
+
+  @@id([memberId, roleId])
+  @@index([organizationId])
+  @@map("member_roles")
+}
+
+// [T]
+model Invitation {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  email           String
+  roleId          String    @map("role_id") @db.Uuid
+  tokenHash       String    @unique @map("token_hash")
+  invitedByUserId String?   @map("invited_by_user_id") @db.Uuid
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@index([organizationId, email])
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------- audit (append-only)
+
+// [T][A] organization_id is NULL for platform-level events (login, registration). Rows are written
+// with the system role; the app role may only read its own tenant's rows. UPDATE/DELETE are revoked
+// and rejected by trigger.
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  actorType      String   @default("USER") @map("actor_type")
+  action         String
+  targetType     String?  @map("target_type")
+  targetId       String?  @map("target_id")
+  before         Json?
+  after          Json?
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  requestId      String?  @map("request_id")
+  at             DateTime @default(now()) @db.Timestamptz
+
+  @@index([organizationId, at(sort: Desc)])
+  @@index([actorUserId, at(sort: Desc)])
+  @@map("audit_logs")
+}
+
+// ================================================================ M2: fleet core (minimal) and GPS routing
+
+enum DeviceLifecycleStatus {
+  REGISTERED
+  AWAITING_CONFIGURATION
+  AWAITING_FIRST_SIGNAL
+  ACTIVE
+  CONFIGURATION_ERROR
+  SUSPENDED
+  RETIRED
+}
+
+enum EngineSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+// [T] Minimal vehicle (registration number + organization). Full vehicle management is M5.
+// Partial/expression unique index on (organization_id, upper(registration_number)) WHERE deleted_at IS NULL is raw SQL.
+model Vehicle {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organizationId     String       @map("organization_id") @db.Uuid
+  registrationNumber String       @map("registration_number")
+  // ---- M5a vehicle details. Every one is optional: a field the customer has not filled in is unknown, never a default.
+  make               String?
+  model              String?
+  year               Int?         @db.SmallInt
+  color              String?
+  vehicleType        VehicleType? @map("vehicle_type")
+  vin                String?
+  fuelType           FuelType?    @map("fuel_type")
+  /// Dates only (no time of day): the day a paper expires.
+  insuranceExpiry    DateTime?    @map("insurance_expiry") @db.Date
+  inspectionExpiry   DateTime?    @map("inspection_expiry") @db.Date
+  notes              String?
+  categoryId         String?      @map("category_id") @db.Uuid
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime?    @map("deleted_at") @db.Timestamptz
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category          VehicleCategory?   @relation(fields: [organizationId, categoryId], references: [organizationId, id])
+  assignments       DeviceAssignment[]
+  driverAssignments DriverAssignment[]
+  documents         VehicleDocument[]
+  liveState         VehicleLiveState?
+  alerts            Alert[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("vehicles")
+}
+
+// A physical tracker. NOT tied to one vehicle or organization forever (ownership vs operation, ADR-0003).
+// `unique_id` is what the device transmits (usually the IMEI) and is globally unique.
+model GpsDevice {
+  id                    String                @id @default(uuid()) @db.Uuid
+  uniqueId              String                @unique @map("unique_id")
+  name                  String?
+  ownerOrganizationId   String                @map("owner_organization_id") @db.Uuid
+  currentOrganizationId String?               @map("current_organization_id") @db.Uuid
+  traccarDeviceId       Int?                  @unique @map("traccar_device_id")
+  engineSyncStatus      EngineSyncStatus      @default(PENDING) @map("engine_sync_status")
+  engineSyncError       String?               @map("engine_sync_error")
+  lifecycleStatus       DeviceLifecycleStatus @default(REGISTERED) @map("lifecycle_status")
+  isSimulated           Boolean               @default(false) @map("is_simulated")
+  firstSignalAt         DateTime?             @map("first_signal_at") @db.Timestamptz
+  lastSeenAt            DateTime?             @map("last_seen_at") @db.Timestamptz
+  /// M5b: the catalogue variant this device was identified as. null = model not identified (all capabilities UNKNOWN).
+  variantId             String?               @map("variant_id") @db.Uuid
+  /// What the customer or a technician entered; the platform does not read it from the device in M5b.
+  firmwareVersion       String?               @map("firmware_version")
+  serialNumber          String?               @map("serial_number")
+  simIccid              String?               @map("sim_iccid")
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  owner         Organization          @relation("DeviceOwner", fields: [ownerOrganizationId], references: [id])
+  current       Organization?         @relation("DeviceOperator", fields: [currentOrganizationId], references: [id])
+  variant       GpsDeviceVariant?     @relation(fields: [variantId], references: [id])
+  assignments   DeviceAssignment[]
+  statusHistory DeviceStatusHistory[]
+
+  @@index([ownerOrganizationId])
+  @@index([currentOrganizationId])
+  @@index([variantId])
+  @@map("gps_devices")
+}
+
+// [T] History of which vehicle a device was installed on. Closed rows are immutable; rows are never deleted.
+// History/trip queries must be bounded by these windows (gps-tenant-isolation §5).
+model DeviceAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  deviceId       String    @map("device_id") @db.Uuid
+  vehicleId      String    @map("vehicle_id") @db.Uuid
+  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  unassignedAt   DateTime? @map("unassigned_at") @db.Timestamptz
+  reason         String?
+  assignedBy     String?   @map("assigned_by") @db.Uuid
+  unassignedBy   String?   @map("unassigned_by") @db.Uuid
+
+  device  GpsDevice @relation(fields: [deviceId], references: [id])
+  vehicle Vehicle   @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+
+  @@index([organizationId, vehicleId, assignedAt(sort: Desc)])
+  @@index([deviceId, assignedAt(sort: Desc)])
+  @@map("device_assignments")
+}
+
+// [T] Latest known state per vehicle (one row, upserted). Raw positions stay in Traccar (ADR-0004).
+model VehicleLiveState {
+  vehicleId       String        @id @map("vehicle_id") @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  deviceId        String        @map("device_id") @db.Uuid
+  latitude        Float?
+  longitude       Float?
+  speedKmh        Float?        @map("speed_kmh")
+  heading         Float?
+  /// tri-state: null = not reported
+  ignition        Boolean?
+  /// tri-state engine/device motion flag
+  motion          Boolean?
+  lastFixAt       DateTime?     @map("last_fix_at") @db.Timestamptz
+  lastSeenAt      DateTime      @map("last_seen_at") @db.Timestamptz
+  lastFixInvalid  Boolean       @default(false) @map("last_fix_invalid")
+  /// The last accepted fix arrived long after it was recorded (buffered data).
+  lastFixDelayed  Boolean       @default(false) @map("last_fix_delayed")
+  /// Since when the vehicle has been below the moving speed (by fix time).
+  stationarySince DateTime?     @map("stationary_since") @db.Timestamptz
+  /// Last status computed by the pipeline/sweeper (reads re-derive it; this makes it queryable and detects changes).
+  status          VehicleStatus @default(NO_DATA)
+  statusChangedAt DateTime?     @map("status_changed_at") @db.Timestamptz
+  simulated       Boolean       @default(false)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, vehicleId])
+  @@index([organizationId, lastSeenAt(sort: Desc)])
+  @@map("vehicle_live_state")
+}
+
+// ================================================================ M3: status, alerts
+
+enum VehicleStatus {
+  NO_DATA
+  OFFLINE
+  MOVING
+  IDLING
+  PARKED
+  STATIONARY
+}
+
+enum AlertType {
+  OVERSPEED
+  IGNITION_ON
+  IGNITION_OFF
+  DEVICE_OFFLINE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// [T] What the organization wants to be alerted about. M3 provides the data model + evaluation; notification channels,
+// recipients, schedules and geofence rules are M6/M8. No rule => no alert (default rules are seeded in M8).
+model AlertRule {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  type            AlertType
+  params          Json          @default("{}")
+  severity        AlertSeverity @default(WARNING)
+  cooldownSeconds Int           @default(300) @map("cooldown_seconds")
+  enabled         Boolean       @default(true)
+  createdBy       String?       @map("created_by") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  alerts       Alert[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, type, enabled])
+  @@map("alert_rules")
+}
+
+// [T] One row per raised alert (already de-duplicated by the rule's cooldown). Simulated/delayed are carried end to end.
+model Alert {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  vehicleId      String        @map("vehicle_id") @db.Uuid
+  ruleId         String?       @map("rule_id") @db.Uuid
+  type           AlertType
+  severity       AlertSeverity
+  startedAt      DateTime      @map("started_at") @db.Timestamptz
+  latitude       Float?
+  longitude      Float?
+  simulated      Boolean       @default(false)
+  delayed        Boolean       @default(false)
+  acknowledgedBy String?       @map("acknowledged_by") @db.Uuid
+  acknowledgedAt DateTime?     @map("acknowledged_at") @db.Timestamptz
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  vehicle Vehicle    @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Cascade)
+  rule    AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, startedAt(sort: Desc)])
+  @@index([organizationId, vehicleId, type, startedAt(sort: Desc)])
+  @@map("alerts")
+}
+
+// ================================================================ M5a: vehicle management, drivers, documents
+
+enum VehicleType {
+  CAR
+  MOTORCYCLE
+  TRUCK
+  VAN
+  BUS
+  PICKUP
+  TRACTOR
+  OTHER
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+  LPG
+  OTHER
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum VehicleDocumentType {
+  INSURANCE
+  INSPECTION
+  REGISTRATION
+  PERMIT
+  OTHER
+}
+
+/// A customer's own grouping of vehicles (e.g. "Delivery vans"). Names are unique per organization (case-insensitive).
+model VehicleCategory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  /// Optional `#rrggbb` accent. NOT a status colour (those are reserved for vehicle status).
+  color          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicles     Vehicle[]
+
+  @@unique([organizationId, id])
+  @@map("vehicle_categories")
+}
+
+/// A person who may drive the organization's vehicles. Deliberately minimal personal data (no national id, photo or address).
+model Driver {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  fullName       String       @map("full_name")
+  /// E.164, e.g. +250788123456
+  phone          String?
+  email          String?
+  licenseNumber  String?      @map("license_number")
+  licenseClass   String?      @map("license_class")
+  licenseExpiry  DateTime?    @map("license_expiry") @db.Date
+  status         DriverStatus @default(ACTIVE)
+  notes          String?
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignments  DriverAssignment[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("drivers")
+}
+
+/// Which driver is ASSIGNED to which vehicle, and when. History is append-only (closed rows are immutable, nothing is deleted).
+/// "Assigned" is not "driving": the platform never claims the assigned person is the one at the wheel.
+model DriverAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  vehicleId      String    @map("vehicle_id") @db.Uuid
+  driverId       String    @map("driver_id") @db.Uuid
+  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  unassignedAt   DateTime? @map("unassigned_at") @db.Timestamptz
+  reason         String?
+  assignedBy     String?   @map("assigned_by") @db.Uuid
+  unassignedBy   String?   @map("unassigned_by") @db.Uuid
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+  driver  Driver  @relation(fields: [organizationId, driverId], references: [organizationId, id])
+
+  @@index([organizationId, vehicleId, assignedAt(sort: Desc)])
+  @@index([organizationId, driverId, assignedAt(sort: Desc)])
+  @@map("driver_assignments")
+}
+
+/// A record of a paper kept for a vehicle (insurance, inspection, registration, permit). The record, not the file:
+/// storing scans needs an object-storage and data-localisation decision (OQ-035).
+model VehicleDocument {
+  id              String              @id @default(uuid()) @db.Uuid
+  organizationId  String              @map("organization_id") @db.Uuid
+  vehicleId       String              @map("vehicle_id") @db.Uuid
+  type            VehicleDocumentType
+  title           String
+  referenceNumber String?             @map("reference_number")
+  issuedOn        DateTime?           @map("issued_on") @db.Date
+  expiresOn       DateTime?           @map("expires_on") @db.Date
+  notes           String?
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?           @map("deleted_at") @db.Timestamptz
+
+  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+
+  @@index([organizationId, vehicleId, createdAt(sort: Desc)])
+  @@index([organizationId, expiresOn])
+  @@map("vehicle_documents")
+}
+
+// ================================================================ M5b: device catalogue, lifecycle, consent (ADR-0009)
+
+enum CompatibilityStatus {
+  VERIFIED
+  SUPPORTED_UNVERIFIED
+  PARTIAL
+  UNSUPPORTED
+  REQUIRES_CONFIGURATION
+}
+
+enum CapabilitySupport {
+  SUPPORTED
+  PARTIAL
+  NOT_SUPPORTED
+  REQUIRES_CONFIGURATION
+}
+
+enum IdentifierType {
+  IMEI
+  SERIAL
+  OTHER
+}
+
+enum ConsentKind {
+  TRACKING_NOTICE
+}
+
+enum ConsentNoticeStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum SupportRequestStatus {
+  OPEN
+  RESOLVED
+  DECLINED
+}
+
+/// GLOBAL (not tenant-owned): written only by platform staff, read by customers through the listing endpoint.
+model GpsManufacturer {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  website   String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  models GpsDeviceModel[]
+
+  @@map("gps_manufacturers")
+}
+
+model GpsDeviceModel {
+  id                       String         @id @default(uuid()) @db.Uuid
+  manufacturerId           String         @map("manufacturer_id") @db.Uuid
+  name                     String
+  /// Engine protocol name, e.g. "osmand". The decoder must exist in the pinned engine version.
+  protocol                 String
+  /// Port the device connects to on the platform's GPS server (configuration instructions); null = not recorded.
+  enginePort               Int?           @map("engine_port")
+  networkTechnologies      String[]       @map("network_technologies")
+  identifierType           IdentifierType @default(IMEI) @map("identifier_type")
+  /// Free text from the documentation, e.g. "10 s moving, 30 min parked"; never used for logic.
+  reportingNotes           String?        @map("reporting_notes")
+  /// Customer-facing setup text (server, APN and device settings). Shown with the platform's host and the model's port.
+  configurationNotes       String?        @map("configuration_notes")
+  installationRequirements String?        @map("installation_requirements")
+  knownLimitations         String?        @map("known_limitations")
+  docsUrl                  String?        @map("docs_url")
+  /// Offered to customers in onboarding. A model with no source stays unlisted/absent: onboarding then offers "Request support".
+  isListed                 Boolean        @default(false) @map("is_listed")
+  /// A software profile of the platform simulator, NOT a physical device.
+  isSimulatorProfile       Boolean        @default(false) @map("is_simulator_profile")
+  createdAt                DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  manufacturer GpsManufacturer    @relation(fields: [manufacturerId], references: [id])
+  variants     GpsDeviceVariant[]
+
+  @@index([manufacturerId])
+  @@map("gps_device_models")
+}
+
+model GpsDeviceVariant {
+  id                  String              @id @default(uuid()) @db.Uuid
+  modelId             String              @map("model_id") @db.Uuid
+  hardwareRevision    String?             @map("hardware_revision")
+  firmwareMin         String?             @map("firmware_min")
+  /// null = open-ended
+  firmwareMax         String?             @map("firmware_max")
+  compatibilityStatus CompatibilityStatus @default(SUPPORTED_UNVERIFIED) @map("compatibility_status")
+  lastTestedAt        DateTime?           @map("last_tested_at") @db.Timestamptz
+  notes               String?
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  model         GpsDeviceModel        @relation(fields: [modelId], references: [id])
+  capabilities  VariantCapability[]
+  verifications VariantVerification[]
+  devices       GpsDevice[]
+
+  @@index([modelId])
+  @@map("gps_device_variants")
+}
+
+/// One row per (variant, capability). No row = UNKNOWN (never "not supported").
+model VariantCapability {
+  variantId         String            @map("variant_id") @db.Uuid
+  capabilityKey     String            @map("capability_key")
+  support           CapabilitySupport
+  /// The attribute the capability shows up as when it works, e.g. "ignition".
+  evidenceAttribute String?           @map("evidence_attribute")
+  evidenceNotes     String?           @map("evidence_notes")
+  verifiedAt        DateTime?         @map("verified_at") @db.Timestamptz
+
+  variant GpsDeviceVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, capabilityKey])
+  @@map("variant_capabilities")
+}
+
+/// Append-only evidence log: a variant is only VERIFIED if at least one row exists (database trigger).
+model VariantVerification {
+  id              String   @id @default(uuid()) @db.Uuid
+  variantId       String   @map("variant_id") @db.Uuid
+  testedAt        DateTime @map("tested_at") @db.Timestamptz
+  testedByUserId  String?  @map("tested_by_user_id") @db.Uuid
+  testedByName    String   @map("tested_by_name")
+  firmwareVersion String   @map("firmware_version")
+  procedure       String
+  evidence        String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  variant GpsDeviceVariant @relation(fields: [variantId], references: [id])
+
+  @@index([variantId, testedAt(sort: Desc)])
+  @@map("variant_verifications")
+}
+
+/// [T] Lifecycle history of a device (ADR-0005). Append-only. Connectivity changes are NOT recorded here.
+model DeviceStatusHistory {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  deviceId       String                 @map("device_id") @db.Uuid
+  fromStatus     DeviceLifecycleStatus? @map("from_status")
+  toStatus       DeviceLifecycleStatus  @map("to_status")
+  /// null = the platform itself (e.g. first signal detected)
+  actorUserId    String?                @map("actor_user_id") @db.Uuid
+  reason         String?
+  at             DateTime               @default(now()) @db.Timestamptz
+
+  device GpsDevice @relation(fields: [deviceId], references: [id])
+
+  @@index([organizationId, deviceId, at(sort: Desc)])
+  @@map("device_status_history")
+}
+
+/// GLOBAL, versioned. A PUBLISHED notice never changes (trigger); a new wording is a new version.
+model ConsentNotice {
+  id             String              @id @default(uuid()) @db.Uuid
+  kind           ConsentKind
+  version        Int
+  title          String
+  body           String
+  status         ConsentNoticeStatus @default(DRAFT)
+  /// Shown on screen when true: the wording has not been through legal review (OQ-020, OQ-037).
+  isDraftWording Boolean             @default(true) @map("is_draft_wording")
+  publishedAt    DateTime?           @map("published_at") @db.Timestamptz
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  records ConsentRecord[]
+
+  @@unique([kind, version])
+  @@map("consent_notices")
+}
+
+/// [T] Who acknowledged which notice version, when, and for which device. Append-only.
+model ConsentRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  noticeId       String   @map("notice_id") @db.Uuid
+  deviceId       String?  @map("device_id") @db.Uuid
+  acceptedAt     DateTime @default(now()) @map("accepted_at") @db.Timestamptz
+
+  notice ConsentNotice @relation(fields: [noticeId], references: [id])
+
+  @@index([organizationId, acceptedAt(sort: Desc)])
+  @@map("consent_records")
+}
+
+/// [T] "My device is not listed". Platform staff read these across tenants with the system role.
+model DeviceSupportRequest {
+  id               String               @id @default(uuid()) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  requestedBy      String               @map("requested_by") @db.Uuid
+  manufacturerText String               @map("manufacturer_text")
+  modelText        String               @map("model_text")
+  firmwareText     String?              @map("firmware_text")
+  notes            String?
+  status           SupportRequestStatus @default(OPEN)
+  resolutionNote   String?              @map("resolution_note")
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt       DateTime?            @map("resolved_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("device_support_requests")
+}

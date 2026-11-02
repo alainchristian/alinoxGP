@@ -1,0 +1,19 @@
+[
+  {
+    "id": 12,
+    "attributes": {},
+    "groupId": 0,
+    "calendarId": 0,
+    "name": "fixture-device-1",
+    "uniqueId": "FIXTURE-1",
+    "status": "online",
+    "lastUpdate": "2026-11-01T09:46:04.816+00:00",
+    "positionId": 58,
+    "phone": null,
+    "model": "simulator",
+    "contact": null,
+    "category": null,
+    "disabled": false,
+    "expirationTime": null
+  }
+]

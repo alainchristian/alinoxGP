@@ -1,0 +1,181 @@
+[
+  {
+    "case": "A valid moving",
+    "params": {
+      "lat": -1.9441,
+      "lon": 30.0619,
+      "speed": 20,
+      "bearing": 90,
+      "altitude": 1500,
+      "accuracy": 5,
+      "batt": 90,
+      "ignition": "true",
+      "timestamp": 1793526212
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3257,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3178
+  },
+  {
+    "case": "B speed 10 (unit probe)",
+    "params": {
+      "lat": -1.9442,
+      "lon": 30.0629,
+      "speed": 10,
+      "bearing": 90,
+      "ignition": "true",
+      "timestamp": 1793526217
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3269,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3127
+  },
+  {
+    "case": "C ignition=false",
+    "params": {
+      "lat": -1.9442,
+      "lon": 30.0629,
+      "speed": 0,
+      "ignition": "false",
+      "timestamp": 1793526222
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3368,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3141
+  },
+  {
+    "case": "D no ignition param",
+    "params": {
+      "lat": -1.9442,
+      "lon": 30.0629,
+      "speed": 0,
+      "timestamp": 1793526227
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3303,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3178
+  },
+  {
+    "case": "E latitude 95",
+    "params": {
+      "lat": 95,
+      "lon": 30,
+      "speed": 0,
+      "timestamp": 1793526232
+    },
+    "httpStatus": "connection-closed (UND_ERR_SOCKET)",
+    "storedInHistory": false,
+    "restVisibleAfterMs": null,
+    "pushedOnWebSocket": false,
+    "wsFirstPushAfterMs": null
+  },
+  {
+    "case": "F zero/zero",
+    "params": {
+      "lat": 0,
+      "lon": 0,
+      "speed": 0,
+      "timestamp": 1793526237
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3286,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3184
+  },
+  {
+    "case": "G custom attributes",
+    "params": {
+      "lat": -1.9443,
+      "lon": 30.063,
+      "speed": 0,
+      "timestamp": 1793526242,
+      "hdop": 1.2,
+      "sat": 9,
+      "power": 12.4,
+      "out1": "true",
+      "simulated": "true"
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3277,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3073
+  },
+  {
+    "case": "H older than latest (-10 min)",
+    "params": {
+      "lat": -1.9,
+      "lon": 30,
+      "speed": 1,
+      "timestamp": 1793525712
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3284,
+    "pushedOnWebSocket": false,
+    "wsFirstPushAfterMs": null
+  },
+  {
+    "case": "I future +2h",
+    "params": {
+      "lat": -1.95,
+      "lon": 30.07,
+      "speed": 1,
+      "timestamp": 1793533512
+    },
+    "httpStatus": 200,
+    "storedInHistory": false,
+    "restVisibleAfterMs": null,
+    "pushedOnWebSocket": false,
+    "wsFirstPushAfterMs": null
+  },
+  {
+    "case": "J future +30 min",
+    "params": {
+      "lat": -1.95,
+      "lon": 30.07,
+      "speed": 1,
+      "timestamp": 1793528112
+    },
+    "httpStatus": 200,
+    "storedInHistory": false,
+    "restVisibleAfterMs": null,
+    "pushedOnWebSocket": false,
+    "wsFirstPushAfterMs": null
+  },
+  {
+    "case": "K no timestamp (server time)",
+    "params": {
+      "lat": -1.96,
+      "lon": 30.08,
+      "speed": 1
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3398,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3154
+  },
+  {
+    "case": "L exact duplicate of K",
+    "params": {
+      "lat": -1.96,
+      "lon": 30.08,
+      "speed": 1
+    },
+    "httpStatus": 200,
+    "storedInHistory": true,
+    "restVisibleAfterMs": 3243,
+    "pushedOnWebSocket": true,
+    "wsFirstPushAfterMs": 3147
+  }
+]

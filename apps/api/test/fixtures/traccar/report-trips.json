@@ -1,0 +1,25 @@
+[
+  {
+    "deviceId": 12,
+    "deviceName": "fixture-device-1",
+    "distance": 11642405.48725466,
+    "averageSpeed": 152911.98298881823,
+    "maxSpeed": 0,
+    "spentFuel": 0,
+    "startOdometer": 111.81094314106139,
+    "endOdometer": 11642517.298197802,
+    "startTime": "2026-11-01T09:43:47.000+00:00",
+    "endTime": "2026-11-01T09:46:15.000+00:00",
+    "startPositionId": 53,
+    "endPositionId": 61,
+    "startLat": -1.9442,
+    "startLon": 30.0629,
+    "endLat": 30.07,
+    "endLon": -1.95,
+    "startAddress": null,
+    "endAddress": null,
+    "duration": 148000,
+    "driverUniqueId": null,
+    "driverName": null
+  }
+]

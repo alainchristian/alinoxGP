@@ -1,0 +1,30 @@
+{
+  "name": "gps-platform",
+  "private": true,
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:shared": "pnpm --filter @gps/shared --filter @gps/simulator build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm test:infra:up && pnpm build:shared && pnpm -r test",
+    "test:infra:up": "node infra/scripts/test-stack.cjs up",
+    "test:infra:down": "node infra/scripts/test-stack.cjs down",
+    "test:reset": "node infra/scripts/test-stack.cjs reset",
+    "build": "pnpm build:shared && pnpm -r --filter \"!@gps/shared\" build",
+    "infra:up": "docker compose -f infra/docker-compose.dev.yml up -d --wait",
+    "infra:ensure-db": "docker compose -f infra/docker-compose.dev.yml exec -T postgres bash /docker-entrypoint-initdb.d/02-traccar-db.sh",
+    "infra:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "db:migrate": "pnpm --filter @gps/api db:migrate",
+    "db:seed": "pnpm --filter @gps/api db:seed",
+    "dev:api": "pnpm build:shared && pnpm --filter @gps/api dev",
+    "dev:web": "pnpm --filter @gps/web dev",
+    "sim": "pnpm --filter @gps/simulator sim"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3"
+  }
+}

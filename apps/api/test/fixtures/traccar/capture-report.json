@@ -1,0 +1,76 @@
+{
+  "capturedAt": "2026-11-01T09:45:11.286Z",
+  "notes": {
+    "duplicateUniqueIdStatus": 400,
+    "lookupByUniqueIdCount": 1,
+    "lookupUnknownUniqueIdCount": 0,
+    "putWithoutIdInBodyStatus": 200,
+    "putFullObjectStatus": 200,
+    "disabledDeviceUnknownOsmand": null,
+    "unknownDeviceOsmandStatus": 400,
+    "unknownDeviceWasAutoRegistered": false,
+    "sendCommandToOsmandDevice": {
+      "status": 202,
+      "body": {
+        "id": 4,
+        "attributes": {},
+        "deviceId": 12,
+        "type": "positionSingle",
+        "textChannel": false
+      }
+    },
+    "GET /api/commands/queue?deviceId=12": {
+      "status": 404,
+      "body": "org.glassfish.jersey.server.ParamException$PathParamException: HTTP 404 Not Found\n\tat org.glassfish.jersey.server.internal.inject.PathParamValueParamProvider$PathParamValueProvider.apply(PathParamValu"
+    },
+    "GET /api/commands?deviceId=12": {
+      "status": 200,
+      "body": "[]"
+    },
+    "GET /api/commands/send?deviceId=12": {
+      "status": 200,
+      "body": "[]"
+    },
+    "geofenceCreateStatus": 200,
+    "permissionsLinkStatus": 204
+  },
+  "server": {
+    "id": 1,
+    "attributes": {},
+    "registration": false,
+    "readonly": false,
+    "deviceReadonly": false,
+    "map": null,
+    "bingKey": null,
+    "mapUrl": null,
+    "overlayUrl": null,
+    "latitude": 0,
+    "longitude": 0,
+    "zoom": 0,
+    "forceSettings": false,
+    "coordinateFormat": null,
+    "limitCommands": false,
+    "disableReports": false,
+    "fixedEmail": false,
+    "poiLayer": null,
+    "announcement": null,
+    "emailEnabled": false,
+    "geocoderEnabled": false,
+    "textEnabled": false,
+    "storageSpace": [
+      1006597582848,
+      1081101176832,
+      1006597582848,
+      1081101176832,
+      1006597582848,
+      1081101176832,
+      1006597582848,
+      1081101176832
+    ],
+    "newServer": false,
+    "openIdEnabled": false,
+    "openIdForce": false,
+    "version": "6.16.0"
+  },
+  "traccarVersion": "6.16.0"
+}

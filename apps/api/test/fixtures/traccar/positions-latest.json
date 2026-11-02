@@ -1,0 +1,51 @@
+[
+  {
+    "id": 3,
+    "attributes": {
+      "ignition": true,
+      "distance": 0,
+      "totalDistance": 1115.1094167912674,
+      "motion": true,
+      "hours": 83000
+    },
+    "deviceId": 1,
+    "protocol": "osmand",
+    "serverTime": "2026-11-01T09:34:50.914+00:00",
+    "deviceTime": "2026-11-01T09:34:50.000+00:00",
+    "fixTime": "2026-11-01T09:34:50.000+00:00",
+    "valid": true,
+    "latitude": -1.95,
+    "longitude": 30.07,
+    "altitude": 0,
+    "speed": 10,
+    "course": 45,
+    "address": null,
+    "accuracy": 0,
+    "network": null,
+    "geofenceIds": null
+  },
+  {
+    "id": 58,
+    "attributes": {
+      "distance": 0,
+      "totalDistance": 6708548.040015572,
+      "motion": true,
+      "hours": 5000
+    },
+    "deviceId": 12,
+    "protocol": "osmand",
+    "serverTime": "2026-11-01T09:46:04.809+00:00",
+    "deviceTime": "2026-11-01T09:46:04.810+00:00",
+    "fixTime": "2026-11-01T09:46:04.810+00:00",
+    "valid": true,
+    "latitude": -1.96,
+    "longitude": 30.08,
+    "altitude": 0,
+    "speed": 1,
+    "course": 0,
+    "address": null,
+    "accuracy": 0,
+    "network": null,
+    "geofenceIds": null
+  }
+]

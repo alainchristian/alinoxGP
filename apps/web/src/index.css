@@ -1,0 +1,104 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (gps-fleet-ui §2): neutral greys + ONE brand accent. Status colours are reserved for
+ * vehicle/device status and never used decoratively. Type scale 12/13/14/16/20/24; radius <= 8px.
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f3f6;
+  --color-border: #dfe3e9;
+  --color-border-strong: #c5ccd6;
+  --color-text: #141a24;
+  --color-text-muted: #556070;
+  --color-text-faint: #6b7686;
+
+  --color-brand: #1d4ed8;
+  --color-brand-hover: #1e40af;
+  --color-brand-soft: #e8efff;
+  --color-brand-text: #ffffff;
+
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-warn-soft: #fff4e0;
+  --color-warn: #8a5a00;
+  --color-ok-soft: #e6f4ea;
+  --color-ok: #17692e;
+
+  /* Vehicle status (gps-fleet-ui §2). ONLY for status — never decorative. Each status also has its own icon and text, so colour is never the only signal. */
+  --color-status-moving: #17692e;
+  --color-status-moving-soft: #e6f4ea;
+  --color-status-idling: #8a5a00;
+  --color-status-idling-soft: #fff4e0;
+  --color-status-parked: #2b4d8f;
+  --color-status-parked-soft: #e8efff;
+  --color-status-stationary: #475569;
+  --color-status-stationary-soft: #eef1f5;
+  --color-status-offline: #556070;
+  --color-status-offline-soft: #f1f3f6;
+
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-text: #cbd5e1;
+  --color-sidebar-active: #ffffff;
+  --color-admin: #7c2d12;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --text-xs: 12px;
+  --text-13: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Metrics, times and counts align in columns. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Live map: the count shown on a cluster of vehicles (a light DOM label, so no map font server is needed). */
+.cluster-label {
+  pointer-events: none;
+  color: #ffffff;
+  font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.cluster-popup .maplibregl-popup-content {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}

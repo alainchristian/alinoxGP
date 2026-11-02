@@ -1,0 +1,17 @@
+[
+  {
+    "deviceId": 12,
+    "deviceName": "fixture-device-1",
+    "distance": 4927974.284857146,
+    "averageSpeed": 0,
+    "maxSpeed": 0,
+    "spentFuel": 0,
+    "startOdometer": 6714543.013340656,
+    "endOdometer": 11642517.298197802,
+    "startTime": "2026-11-01T09:35:12.000+00:00",
+    "endTime": "2026-11-01T09:46:15.000+00:00",
+    "startHours": 5000,
+    "endHours": 5000,
+    "engineHours": 0
+  }
+]
