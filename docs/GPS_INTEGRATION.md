@@ -41,7 +41,7 @@ Consequence: a tracker whose clock runs more than 10 minutes ahead has its data 
 
 ## 5. The port and adapter [Decided; implemented]
 
-`src/integrations/gps-engine/port.ts` (`GpsEnginePort`) is all the rest of the app sees: `registerDevice` (idempotent), `findDeviceByUniqueId`, `listDevices`, `updateDevice` (read-modify-write: PUT replaces the whole object), `removeDevice`, `getLatestPositions`, `getRoute`, `subscribe`, `health`. Trips, stops, geofences and commands are added by M6/M7 — not stubbed.
+`src/integrations/gps-engine/port.ts` (`GpsEnginePort`) is all the rest of the app sees: `registerDevice` (idempotent), `findDeviceByUniqueId`, `listDevices`, `updateDevice` (read-modify-write: PUT replaces the whole object), `removeDevice`, `getLatestPositions`, `getRoute`, `getTrips`, `getStops` (M6a), `subscribe`, `health`. Geofences (M6b) and commands (M7) are added by the milestones that use them — not stubbed.
 
 - Normalization at the boundary: knots → km/h (×1.852, one decimal); UTC `Date`s; **tri-state** ignition/motion/power/battery (`null` = not reported, never `false`).
 - Every response/frame is validated with zod schemas derived from recorded fixtures; malformed items are dropped and counted (`dropped_malformed`), never forwarded.
@@ -87,6 +87,12 @@ Engine down → registrations stay `PENDING` and are retried; the API stays up (
 | 2026-11-01 | Future-timestamp poisoning + filter | Reproduced; fixed by `FILTER_FUTURE=600` | e2e test "does NOT freeze the live feed" |
 | 2026-11-01 | Command queueing (OQ-006, partial) | Queued and delivered later; purge unknown | `capture-report.json`, `report-events.json` |
 | 2026-11-01 | Geofence WKT order | Latitude-first confirmed | `report-events.json` |
+
+## 13. M6a as built (2026-11-04)
+
+- [Verified against the real 6.16.0 container, history.e2e-spec.ts] `/api/reports/trips` and `/api/reports/stops` return rows for a device and range; trip rows carry `startLat/startLon/endLat/endLon`, `distance` (metres), `averageSpeed`/`maxSpeed` in knots, `duration` in ms; **stop rows carry `latitude`/`longitude`**. A simulated 12-minute drive at 40 km/h followed by a parked period is detected as one trip (≈ 7–8 km, max ≈ 40 km/h) and one stop with the engine's default trip settings.
+- Trip start/stop rules are the engine's defaults (not changed). The platform filters the list instead (OQ-033, decided): trips under 200 m and implausible averages are hidden and counted.
+- Reverse-geocoded addresses are not configured in the engine: `startAddress`/`endAddress` are null.
 
 ## 12. M3a as built (2026-11-02)
 

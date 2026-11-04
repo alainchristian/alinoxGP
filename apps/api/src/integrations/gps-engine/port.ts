@@ -68,6 +68,36 @@ export type EngineStreamMessage =
   /** An item (or whole frame) that failed validation and was dropped. Counted, never forwarded. */
   | { kind: 'malformed'; what: 'frame' | 'position' | 'device' };
 
+/**
+ * A journey as the engine detected it (Traccar's trip report; its start/stop rules are engine configuration, see
+ * docs/GPS_INTEGRATION.md). Distances in metres, speeds in km/h, times UTC. Coordinates are `null` when the engine did not give usable ones.
+ */
+export interface EngineTrip {
+  startTime: Date;
+  endTime: Date;
+  durationMs: number;
+  distanceM: number;
+  maxSpeedKmh: number | null;
+  averageSpeedKmh: number | null;
+  startLatitude: number | null;
+  startLongitude: number | null;
+  endLatitude: number | null;
+  endLongitude: number | null;
+  /** Reverse-geocoded by the engine when it is configured to; usually null. */
+  startAddress: string | null;
+  endAddress: string | null;
+}
+
+/** A stop (parked period) as the engine detected it. */
+export interface EngineStop {
+  startTime: Date;
+  endTime: Date;
+  durationMs: number;
+  latitude: number | null;
+  longitude: number | null;
+  address: string | null;
+}
+
 export interface EngineSubscription {
   stop(): Promise<void>;
 }
@@ -85,6 +115,10 @@ export interface GpsEnginePort {
   getLatestPositions(): Promise<EnginePosition[]>;
   /** Raw route history. Callers MUST clip the range to assignment windows / plan limits first. */
   getRoute(ref: EngineDeviceRef, from: Date, to: Date): Promise<EnginePosition[]>;
+  /** Trips of one device in the range (the engine's trip report). Same clipping rule as getRoute. */
+  getTrips(ref: EngineDeviceRef, from: Date, to: Date): Promise<EngineTrip[]>;
+  /** Stops of one device in the range (the engine's stop report). */
+  getStops(ref: EngineDeviceRef, from: Date, to: Date): Promise<EngineStop[]>;
   /**
    * Live stream of positions and device status. Reconnects automatically (exponential backoff + jitter). After every
    * reconnect a `connection: connected` message is delivered so the consumer can backfill with getLatestPositions().

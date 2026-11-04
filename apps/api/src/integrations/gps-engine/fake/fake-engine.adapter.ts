@@ -4,8 +4,10 @@ import {
   type EngineDevice,
   type EngineDeviceRef,
   type EnginePosition,
+  type EngineStop,
   type EngineStreamMessage,
   type EngineSubscription,
+  type EngineTrip,
   type GpsEnginePort,
 } from '../port';
 
@@ -72,6 +74,20 @@ export class FakeEngineAdapter implements GpsEnginePort {
   async getRoute(ref: EngineDeviceRef, from: Date, to: Date) {
     this.guard();
     return this.positions.filter((p) => p.engineDeviceId === ref.engineId && p.fixTime >= from && p.fixTime <= to);
+  }
+
+  /** Test data for the report queries. */
+  readonly trips = new Map<number, EngineTrip[]>();
+  readonly stops = new Map<number, EngineStop[]>();
+
+  async getTrips(ref: EngineDeviceRef, from: Date, to: Date) {
+    this.guard();
+    return (this.trips.get(ref.engineId) ?? []).filter((t) => t.endTime >= from && t.startTime <= to);
+  }
+
+  async getStops(ref: EngineDeviceRef, from: Date, to: Date) {
+    this.guard();
+    return (this.stops.get(ref.engineId) ?? []).filter((s) => s.endTime >= from && s.startTime <= to);
   }
 
   subscribe(handler: (m: EngineStreamMessage) => void | Promise<void>): EngineSubscription {

@@ -16,7 +16,8 @@ Phase 0 deliverable — 2026-11-01 — aligned with spec §17.4 (milestones are 
 | **M5b — Device catalogue, capabilities, onboarding, diagnostics, consent records** | **In progress (started 2026-11-02, after M5a approval).** Original note:  (owner split M5 on 2026-11-02; needs the physical test devices and OQ-018 / OQ-020 / OQ-024; starts after M5a is approved) |
 | **M1b — Provider hierarchy retrofit** | **Approved by the owner (2026-11-04), committed 4e50a87.** Slices 1–4 done, slice 5 (isolation proof) done for everything that exists. See "M1b as built". Provider-wide live map UI deferred (OQ-040). |
 | M5b (above) | **Approved by the owner (2026-11-04).** |
-| **M6 — Trips, playback, geofencing** | **Started 2026-11-04 — proposed split M6a (trips and playback) / M6b (geofences); waiting for the owner to confirm the split.** See "M6 plan". |
+| **M6a — Trips and playback** | **Implemented and verified against the real engine and in a browser (2026-11-04); awaiting owner review.** Split confirmed by the owner (history default 30 days; 31 days of trip list / 7 days of route per request). See "M6a as built". |
+| **M6b — Geofences** | Not started (waits for M6a approval). |
 | M7 – M11 (**milestone numbers changed on 2026-11-04**: new M9 = speed governor compliance; old M9 → M10 installations/provider billing/platform admin; old M10 → M11 scale proof (M3b) + production) |
 
 ### M6 plan (2026-11-04) — trips, playback, geofencing (proposed split)
@@ -26,6 +27,15 @@ M6 bundles two independent pieces (history through the engine; geofences synced 
 **M6b — Geofences.** Circle and polygon geofences, named locations (CRUD, tenant-scoped, vehicle assignment), WKT conversion (**latitude first**, tested), sync to the engine with reconciliation, enter/exit events from the engine into alerts (existing alert pipeline), dwell (native or delayed jobs, OQ-007), geofence notification **rules** stored and shown in-app (delivery channels arrive in M8). Simulator `geofence-enter-exit` scenario already exists.
 **Exit:** replay a simulator trip; receive geofence events from scenarios; reassignment test (A→B history windows).
 **Decisions needed from the owner:** (1) confirm the split; (2) the default history period until plans exist (proposed: 30 days) and the maximum span of one request (proposed: 7 days for route points, 31 days for trip lists).
+
+### M6a as built (2026-11-04)
+
+- **Engine port:** `getTrips` / `getStops` (Traccar trip and stop reports; knots → km/h, 0,0 and out-of-range coordinates → null). Stop coordinates are `latitude`/`longitude` (found by the real-engine test; trip rows use `startLat` etc.).
+- **API:** `GET /vehicles/:id/trips` and `/route` (see `apps/api/src/modules/history/README.md`): history period, span limits, per-tracker installation windows, hidden trips counted (OQ-033 decided: platform-side filter, engine configuration unchanged), invalid fixes counted, thinning with first/last kept, engine-unavailable flag.
+- **Web:** Trips & playback replaces the placeholder (which showed invented numbers): vehicle + day range in the organization's time zone, journey list with stops, route on the map (split at tracker changes), play/pause/stop, 1×–16×, timeline, statistics, honest notices (installed for part of the period, history period, engine unreachable, hidden short movements, thinned route).
+- **Evidence:** typecheck and lint pass; API unit 117 (new: history rules 17, report mapping 3; the flaky reconnect test race fixed), web 163 (new: playback model 11, branding 3, provider 8), API e2e history 10 against the real Traccar (route order, km/h, tri-state ignition, moved-tracker isolation both ways, real trip and stop detected, 404 for other tenants, permissions, bounds, history period, provider staff + access log, engine unreachable); browser: a simulated drive of a customer vehicle opened as provider staff, replayed on the OpenStreetMap development map.
+- **Not verified:** very long routes on a phone (only the 5000-point cap is tested server-side), reverse geocoded addresses (none), phone/tablet layout of the page, trips of a real tracker (no hardware yet), report latency at scale (M3b).
+- **Deviations:** none. **New open questions:** OQ-041.
 
 ### M1b plan (2026-11-04) — provider hierarchy retrofit
 

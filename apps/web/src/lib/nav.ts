@@ -52,7 +52,7 @@ export const customerNav: NavGroup[] = [
       { label: 'nav.vehicles', path: '/app/vehicles', icon: Car, permission: P.VEHICLES_READ },
       { label: 'nav.drivers', path: '/app/drivers', icon: IdCard, permission: P.DRIVERS_READ },
       { label: 'nav.devices', path: '/app/devices', icon: Cpu, permission: P.DEVICES_READ },
-      { label: 'nav.trips', path: '/app/trips', icon: Navigation, permission: P.TRACKING_LIVE_VIEW },
+      { label: 'nav.trips', path: '/app/trips', icon: Navigation, permission: P.TRIPS_READ },
       { label: 'nav.geofences', path: '/app/geofences', icon: Radar, permission: P.TRACKING_LIVE_VIEW },
     ],
   },

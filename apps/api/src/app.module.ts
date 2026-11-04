@@ -29,6 +29,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { ProvidersModule } from './modules/providers/providers.module';
+import { HistoryModule } from './modules/history/history.module';
 import { MapsModule } from './modules/maps/maps.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { UsersModule } from './modules/users/users.module';
@@ -100,6 +101,7 @@ import { DeviceSupportModule } from './modules/device-support/device-support.mod
     AccessControlModule,
     OrganizationsModule,
     ProvidersModule,
+    HistoryModule,
     AuthModule,
     VehiclesModule,
     VehicleCategoriesModule,

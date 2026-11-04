@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { backoffDelay } from './traccar.stream';
-import { KNOTS_TO_KMH, toEngineDevice, toEnginePosition, triState } from './traccar.mapper';
+import { KNOTS_TO_KMH, toEngineDevice, toEnginePosition, toEngineStop, toEngineTrip, triState } from './traccar.mapper';
 import { traccarDeviceSchema, traccarPositionSchema, traccarSocketFrameSchema } from './traccar.schemas';
 
 const fixture = <T>(name: string): T => JSON.parse(readFileSync(join(__dirname, '../../../../test/fixtures/traccar', name), 'utf8')) as T;
@@ -109,5 +109,34 @@ describe('reconnect backoff', () => {
     expect(backoffDelay(3, hi)).toBeLessThanOrEqual(8000);
     for (let attempt = 8; attempt < 20; attempt++) expect(backoffDelay(attempt, hi)).toBeLessThanOrEqual(30_000);
     expect(backoffDelay(30, lo)).toBe(15_000);
+  });
+});
+
+describe('report mapping (trips and stops)', () => {
+  const trip = { deviceId: 1, startTime: '2026-11-04T10:00:00.000+00:00', endTime: '2026-11-04T10:10:00.000+00:00', duration: 600_000, distance: 6_000, averageSpeed: 20, maxSpeed: 25, startLat: -1.9441, startLon: 30.0619, endLat: 0, endLon: 0 };
+
+  it('converts the engine’s knots to km/h and keeps metres', () => {
+    const t = toEngineTrip(trip);
+    expect(t.maxSpeedKmh).toBe(46.3); // 25 kn
+    expect(t.averageSpeedKmh).toBe(37); // 20 kn
+    expect(t.distanceM).toBe(6000);
+    expect(t.durationMs).toBe(600_000);
+  });
+
+  it('never turns a missing or 0,0 coordinate into a place on the map', () => {
+    const t = toEngineTrip(trip);
+    expect(t.startLatitude).toBe(-1.9441);
+    expect(t.endLatitude).toBeNull();
+    expect(t.endLongitude).toBeNull();
+    expect(toEngineTrip({ ...trip, startLat: null, startLon: null }).startLatitude).toBeNull();
+    expect(toEngineStop({ deviceId: 1, startTime: trip.startTime, endTime: trip.endTime, latitude: 95, longitude: 30 }).latitude).toBeNull();
+  });
+
+  it('leaves unknown speeds unknown instead of 0, and derives a missing duration from the times', () => {
+    const t = toEngineTrip({ deviceId: 1, startTime: trip.startTime, endTime: trip.endTime });
+    expect(t.maxSpeedKmh).toBeNull();
+    expect(t.averageSpeedKmh).toBeNull();
+    expect(t.durationMs).toBe(600_000);
+    expect(t.distanceM).toBe(0);
   });
 });

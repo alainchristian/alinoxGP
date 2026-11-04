@@ -6,13 +6,15 @@ import {
   type EngineDevice,
   type EngineDeviceRef,
   type EnginePosition,
+  type EngineStop,
   type EngineStreamMessage,
   type EngineSubscription,
+  type EngineTrip,
   type GpsEnginePort,
 } from '../port';
 import { TraccarClient } from './traccar.client';
-import { toEngineDevice, toEnginePosition } from './traccar.mapper';
-import { traccarDeviceSchema, traccarPositionSchema, type TraccarDevice } from './traccar.schemas';
+import { toEngineDevice, toEnginePosition, toEngineStop, toEngineTrip } from './traccar.mapper';
+import { traccarDeviceSchema, traccarPositionSchema, traccarStopSchema, traccarTripSchema, type TraccarDevice } from './traccar.schemas';
 import { TraccarStream } from './traccar.stream';
 
 /** Parses a list from the engine; malformed items are dropped (logged without payloads), never thrown. */
@@ -97,6 +99,22 @@ export class TraccarAdapter implements GpsEnginePort {
       timeoutMs: this.env.TRACCAR_REPORT_TIMEOUT_MS,
     });
     return parseList(traccarPositionSchema, body, this.logger, 'position').map(toEnginePosition);
+  }
+
+  async getTrips(ref: EngineDeviceRef, from: Date, to: Date): Promise<EngineTrip[]> {
+    const { body } = await this.client.request<unknown>('GET', '/api/reports/trips', {
+      query: { deviceId: ref.engineId, from: from.toISOString(), to: to.toISOString() },
+      timeoutMs: this.env.TRACCAR_REPORT_TIMEOUT_MS,
+    });
+    return parseList(traccarTripSchema, body, this.logger, 'trip').map(toEngineTrip);
+  }
+
+  async getStops(ref: EngineDeviceRef, from: Date, to: Date): Promise<EngineStop[]> {
+    const { body } = await this.client.request<unknown>('GET', '/api/reports/stops', {
+      query: { deviceId: ref.engineId, from: from.toISOString(), to: to.toISOString() },
+      timeoutMs: this.env.TRACCAR_REPORT_TIMEOUT_MS,
+    });
+    return parseList(traccarStopSchema, body, this.logger, 'stop').map(toEngineStop);
   }
 
   subscribe(handler: (message: EngineStreamMessage) => void | Promise<void>): EngineSubscription {

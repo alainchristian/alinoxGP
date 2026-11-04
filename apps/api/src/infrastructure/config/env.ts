@@ -41,6 +41,18 @@ const envSchema = z
     TRACCAR_PASSWORD: z.string().default(''),
     TRACCAR_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
     TRACCAR_REPORT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
+    /** History (M6a). How far back a customer may look until plans carry `history_days` (M10). */
+    HISTORY_DAYS_DEFAULT: z.coerce.number().int().min(1).max(3650).default(30),
+    /** Longest range of ONE trip-list request. */
+    HISTORY_MAX_SPAN_TRIPS_DAYS: z.coerce.number().int().min(1).max(366).default(31),
+    /** Longest range of ONE route (playback) request: route points are the heavy query. */
+    HISTORY_MAX_SPAN_ROUTE_DAYS: z.coerce.number().int().min(1).max(31).default(7),
+    /** A movement shorter than this is GPS drift while parked, not a trip (OQ-033): hidden from the list and counted. */
+    HISTORY_MIN_TRIP_DISTANCE_M: z.coerce.number().int().min(0).max(5000).default(200),
+    /** A trip whose own distance and duration imply a faster average than this is a bad-fix artefact (a swapped coordinate once gave an 11 642 km trip): hidden and counted. */
+    HISTORY_MAX_PLAUSIBLE_SPEED_KMH: z.coerce.number().int().min(50).max(1000).default(250),
+    /** Playback points returned at most; a longer route is thinned (and says so). */
+    HISTORY_MAX_ROUTE_POINTS: z.coerce.number().int().min(100).max(50000).default(5000),
     /** Run the Traccar WebSocket consumer (single leader across instances). */
     INGESTION_ENABLED: bool.default(true),
     /** Run BullMQ workers (reconciliation, ...). */

@@ -104,6 +104,8 @@ describe('TraccarStream against a local WebSocket server', () => {
     clients[0]!.terminate();
     await until(() => messages.some((m) => m.kind === 'connection' && m.state === 'disconnected'));
     await until(() => clients.length === 2, 8000);
+    // The server sees the new socket slightly before the client announces it: wait for the announcement itself (this was a race).
+    await until(() => messages.filter((m) => m.kind === 'connection' && m.state === 'connected').length === 2, 8000);
     const states = messages.filter((m) => m.kind === 'connection').map((m) => (m as { state: string }).state);
     expect(states).toEqual(['connected', 'disconnected', 'connected']);
     await stream.stop();

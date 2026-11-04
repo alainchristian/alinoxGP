@@ -46,3 +46,34 @@ export const traccarSocketFrameSchema = z.object({
   devices: z.array(z.unknown()).optional(),
   events: z.array(z.unknown()).optional(),
 });
+
+/** One row of /api/reports/trips (recorded fixture report-trips.json). distance is metres; speeds are KNOTS. */
+export const traccarTripSchema = z.object({
+  deviceId: z.number().int(),
+  startTime: z.string(),
+  endTime: z.string(),
+  duration: z.number().nullable().optional(),
+  distance: z.number().nullable().optional(),
+  averageSpeed: z.number().nullable().optional(),
+  maxSpeed: z.number().nullable().optional(),
+  startLat: z.number().nullable().optional(),
+  startLon: z.number().nullable().optional(),
+  endLat: z.number().nullable().optional(),
+  endLon: z.number().nullable().optional(),
+  startAddress: z.string().nullable().optional(),
+  endAddress: z.string().nullable().optional(),
+});
+export type TraccarTrip = z.infer<typeof traccarTripSchema>;
+
+/** One row of /api/reports/stops (the coordinate field names were confirmed against a real report by test/history.e2e-spec.ts). */
+export const traccarStopSchema = z.object({
+  deviceId: z.number().int(),
+  startTime: z.string(),
+  endTime: z.string(),
+  duration: z.number().nullable().optional(),
+  /** Stop items name the coordinates in full (trip items use startLat/endLat). Confirmed by the real report in history.e2e-spec.ts. */
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+  address: z.string().nullable().optional(),
+});
+export type TraccarStop = z.infer<typeof traccarStopSchema>;

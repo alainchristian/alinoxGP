@@ -24,6 +24,7 @@ import { DevicesPage } from '@/features/devices/DevicesPage';
 import { DriversPage } from '@/features/fleet/DriversPage';
 import { VehicleDetailPage } from '@/features/fleet/VehicleDetailPage';
 import { VehiclesPage } from '@/features/fleet/VehiclesPage';
+import { TripsPage } from '@/features/history/TripsPage';
 import { LivePage } from '@/features/live/LivePage';
 import { MonitorPage } from '@/features/monitor/MonitorPage';
 import {
@@ -34,7 +35,6 @@ import {
   GeofencesPage,
   MaintenancePage,
   ReportsAnalyticsPage,
-  TripsPlaybackPage,
   VehicleSecurityPage,
 } from '@/features/operations/AegisModules';
 import { OnboardingPage } from '@/features/organization/OnboardingPage';
@@ -101,7 +101,7 @@ export function App() {
               <Route path="devices" element={<DevicesPage />} />
               <Route path="devices/new" element={<AddDevicePage />} />
               <Route path="devices/:deviceId" element={<DeviceDetailPage />} />
-              <Route path="trips" element={<TripsPlaybackPage />} />
+              <Route path="trips" element={<TripsPage />} />
               <Route path="geofences" element={<GeofencesPage />} />
               <Route path="alerts" element={<AlertsEventsPage />} />
               <Route path="security" element={<VehicleSecurityPage />} />

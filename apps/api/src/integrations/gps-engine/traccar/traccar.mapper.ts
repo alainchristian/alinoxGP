@@ -1,5 +1,5 @@
-import type { EngineDevice, EnginePosition } from '../port';
-import type { TraccarDevice, TraccarPosition } from './traccar.schemas';
+import type { EngineDevice, EnginePosition, EngineStop, EngineTrip } from '../port';
+import type { TraccarDevice, TraccarPosition, TraccarStop, TraccarTrip } from './traccar.schemas';
 
 /** Traccar reports speed in knots. */
 export const KNOTS_TO_KMH = 1.852;
@@ -54,4 +54,36 @@ export function toEnginePosition(p: TraccarPosition): EnginePosition {
     protocol: p.protocol ?? 'unknown',
     raw: a,
   };
+}
+
+const usableCoordinate = (lat: number | null | undefined, lon: number | null | undefined): [number | null, number | null] =>
+  lat != null && lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0) ? [lat, lon] : [null, null];
+
+/** Trip report row -> normalized trip: knots -> km/h, metres kept, an out-of-range coordinate becomes null (never drawn at 0,0). */
+export function toEngineTrip(t: TraccarTrip): EngineTrip {
+  const startTime = new Date(t.startTime);
+  const endTime = new Date(t.endTime);
+  const [startLatitude, startLongitude] = usableCoordinate(t.startLat, t.startLon);
+  const [endLatitude, endLongitude] = usableCoordinate(t.endLat, t.endLon);
+  return {
+    startTime,
+    endTime,
+    durationMs: t.duration ?? Math.max(0, endTime.getTime() - startTime.getTime()),
+    distanceM: Math.max(0, t.distance ?? 0),
+    maxSpeedKmh: t.maxSpeed == null ? null : round1(t.maxSpeed * KNOTS_TO_KMH),
+    averageSpeedKmh: t.averageSpeed == null ? null : round1(t.averageSpeed * KNOTS_TO_KMH),
+    startLatitude,
+    startLongitude,
+    endLatitude,
+    endLongitude,
+    startAddress: t.startAddress ?? null,
+    endAddress: t.endAddress ?? null,
+  };
+}
+
+export function toEngineStop(s: TraccarStop): EngineStop {
+  const startTime = new Date(s.startTime);
+  const endTime = new Date(s.endTime);
+  const [latitude, longitude] = usableCoordinate(s.latitude, s.longitude);
+  return { startTime, endTime, durationMs: s.duration ?? Math.max(0, endTime.getTime() - startTime.getTime()), latitude, longitude, address: s.address ?? null };
 }
