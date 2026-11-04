@@ -123,13 +123,15 @@ export interface OrganizationDto {
   status: 'ACTIVE' | 'SUSPENDED';
   isSandbox: boolean;
   parentOrganizationId: string | null;
+  /** The provider at the top of this branch (the provider itself for a provider; null for the platform). */
+  providerId: string | null;
 }
 export interface MembershipDto {
   memberId: string;
   organization: OrganizationDto;
   roleKeys: string[];
-  /** MEMBER: user belongs to it. CHILD: reseller managing this customer organization. */
-  relation: 'MEMBER' | 'CHILD';
+  /** MEMBER: user belongs to it. CUSTOMER: a customer organization of the provider the user is staff of (provider staff act for it; they are not members). */
+  relation: 'MEMBER' | 'CUSTOMER';
 }
 export interface MeDto {
   user: UserDto;

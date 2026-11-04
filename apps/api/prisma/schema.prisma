@@ -15,8 +15,19 @@ datasource db {
 
 enum OrganizationType {
   PLATFORM
-  RESELLER
+  PROVIDER
   CUSTOMER
+}
+
+enum ProviderStatus {
+  PENDING_VERIFICATION
+  PENDING_APPROVAL
+  TRIAL
+  ACTIVE
+  GRACE
+  SUSPENDED
+  CLOSED
+  REJECTED
 }
 
 enum OrganizationStatus {
@@ -37,7 +48,7 @@ enum MemberStatus {
 enum RoleScope {
   PLATFORM
   ORGANIZATION
-  RESELLER
+  PROVIDER
 }
 
 enum EmailTokenPurpose {
@@ -159,6 +170,8 @@ model Organization {
   id                   String             @id @default(uuid()) @db.Uuid
   type                 OrganizationType   @default(CUSTOMER)
   parentOrganizationId String?            @map("parent_organization_id") @db.Uuid
+  /// The provider at the top of this branch: itself for a PROVIDER, the parent for a CUSTOMER, null for the PLATFORM (set by a database trigger, ADR-0010).
+  providerId           String?            @map("provider_id") @db.Uuid
   name                 String
   legalName            String?            @map("legal_name")
   countryCode          String             @map("country_code") @db.Char(2)
@@ -170,36 +183,45 @@ model Organization {
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
-  parent            Organization?        @relation("OrgTree", fields: [parentOrganizationId], references: [id])
-  children          Organization[]       @relation("OrgTree")
+  parent            Organization?         @relation("OrgTree", fields: [parentOrganizationId], references: [id])
+  children          Organization[]        @relation("OrgTree")
   members           OrganizationMember[]
   invitations       Invitation[]
   vehicles          Vehicle[]
   vehicleCategories VehicleCategory[]
   drivers           Driver[]
-  ownedDevices      GpsDevice[]          @relation("DeviceOwner")
-  operatedDevices   GpsDevice[]          @relation("DeviceOperator")
+  ownedDevices      GpsDevice[]           @relation("DeviceOwner")
+  operatedDevices   GpsDevice[]           @relation("DeviceOperator")
   alertRules        AlertRule[]
+  providerProfile   ProviderProfile?
+  entitlements      CustomerEntitlement[]
+  scopedFor         MemberCustomerScope[]
 
   @@index([parentOrganizationId])
+  @@index([providerId])
   @@map("organizations")
 }
 
 // [T] tenant-owned: RLS enforced (see migration).
 model OrganizationMember {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  userId         String       @map("user_id") @db.Uuid
-  status         MemberStatus @default(ACTIVE)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  id                String       @id @default(uuid()) @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  status            MemberStatus @default(ACTIVE)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  /// Provider staff only: true = may act only for the customers listed in member_customer_scopes.
+  scopedToCustomers Boolean      @default(false) @map("scoped_to_customers")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roles        MemberRole[]
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles          MemberRole[]
+  customerScopes MemberCustomerScope[]
+  providerId     String?               @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@unique([organizationId, userId])
   @@unique([organizationId, id]) // target of composite FKs
   @@index([userId])
+  @@index([providerId])
   @@map("organization_members")
 }
 
@@ -248,11 +270,13 @@ model MemberRole {
   roleId         String   @map("role_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  member OrganizationMember @relation(fields: [organizationId, memberId], references: [organizationId, id], onDelete: Cascade)
-  role   Role               @relation(fields: [roleId], references: [id])
+  member     OrganizationMember @relation(fields: [organizationId, memberId], references: [organizationId, id], onDelete: Cascade)
+  role       Role               @relation(fields: [roleId], references: [id])
+  providerId String?            @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@id([memberId, roleId])
   @@index([organizationId])
+  @@index([providerId])
   @@map("member_roles")
 }
 
@@ -271,8 +295,10 @@ model Invitation {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   role         Role         @relation(fields: [roleId], references: [id])
+  providerId   String?      @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, email])
+  @@index([providerId])
   @@map("invitations")
 }
 
@@ -295,9 +321,11 @@ model AuditLog {
   userAgent      String?  @map("user_agent")
   requestId      String?  @map("request_id")
   at             DateTime @default(now()) @db.Timestamptz
+  providerId     String?  @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, at(sort: Desc)])
   @@index([actorUserId, at(sort: Desc)])
+  @@index([providerId])
   @@map("audit_logs")
 }
 
@@ -349,9 +377,11 @@ model Vehicle {
   documents         VehicleDocument[]
   liveState         VehicleLiveState?
   alerts            Alert[]
+  providerId        String             @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@unique([organizationId, id])
   @@index([organizationId, createdAt(sort: Desc)])
+  @@index([providerId])
   @@map("vehicles")
 }
 
@@ -384,10 +414,12 @@ model GpsDevice {
   variant       GpsDeviceVariant?     @relation(fields: [variantId], references: [id])
   assignments   DeviceAssignment[]
   statusHistory DeviceStatusHistory[]
+  providerId    String                @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([ownerOrganizationId])
   @@index([currentOrganizationId])
   @@index([variantId])
+  @@index([providerId])
   @@map("gps_devices")
 }
 
@@ -404,11 +436,13 @@ model DeviceAssignment {
   assignedBy     String?   @map("assigned_by") @db.Uuid
   unassignedBy   String?   @map("unassigned_by") @db.Uuid
 
-  device  GpsDevice @relation(fields: [deviceId], references: [id])
-  vehicle Vehicle   @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+  device     GpsDevice @relation(fields: [deviceId], references: [id])
+  vehicle    Vehicle   @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+  providerId String    @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, vehicleId, assignedAt(sort: Desc)])
   @@index([deviceId, assignedAt(sort: Desc)])
+  @@index([providerId])
   @@map("device_assignments")
 }
 
@@ -438,10 +472,12 @@ model VehicleLiveState {
   simulated       Boolean       @default(false)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Cascade)
+  vehicle    Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Cascade)
+  providerId String  @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@unique([organizationId, vehicleId])
   @@index([organizationId, lastSeenAt(sort: Desc)])
+  @@index([providerId])
   @@map("vehicle_live_state")
 }
 
@@ -485,9 +521,11 @@ model AlertRule {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   alerts       Alert[]
+  providerId   String       @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@unique([organizationId, id])
   @@index([organizationId, type, enabled])
+  @@index([providerId])
   @@map("alert_rules")
 }
 
@@ -508,11 +546,13 @@ model Alert {
   acknowledgedAt DateTime?     @map("acknowledged_at") @db.Timestamptz
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
-  vehicle Vehicle    @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Cascade)
-  rule    AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  vehicle    Vehicle    @relation(fields: [organizationId, vehicleId], references: [organizationId, id], onDelete: Cascade)
+  rule       AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  providerId String     @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, startedAt(sort: Desc)])
   @@index([organizationId, vehicleId, type, startedAt(sort: Desc)])
+  @@index([providerId])
   @@map("alerts")
 }
 
@@ -563,8 +603,10 @@ model VehicleCategory {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   vehicles     Vehicle[]
+  providerId   String       @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@unique([organizationId, id])
+  @@index([providerId])
   @@map("vehicle_categories")
 }
 
@@ -587,9 +629,11 @@ model Driver {
 
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assignments  DriverAssignment[]
+  providerId   String             @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@unique([organizationId, id])
   @@index([organizationId, createdAt(sort: Desc)])
+  @@index([providerId])
   @@map("drivers")
 }
 
@@ -606,11 +650,13 @@ model DriverAssignment {
   assignedBy     String?   @map("assigned_by") @db.Uuid
   unassignedBy   String?   @map("unassigned_by") @db.Uuid
 
-  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
-  driver  Driver  @relation(fields: [organizationId, driverId], references: [organizationId, id])
+  vehicle    Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+  driver     Driver  @relation(fields: [organizationId, driverId], references: [organizationId, id])
+  providerId String  @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, vehicleId, assignedAt(sort: Desc)])
   @@index([organizationId, driverId, assignedAt(sort: Desc)])
+  @@index([providerId])
   @@map("driver_assignments")
 }
 
@@ -630,10 +676,12 @@ model VehicleDocument {
   updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt       DateTime?           @map("deleted_at") @db.Timestamptz
 
-  vehicle Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+  vehicle    Vehicle @relation(fields: [organizationId, vehicleId], references: [organizationId, id])
+  providerId String  @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, vehicleId, createdAt(sort: Desc)])
   @@index([organizationId, expiresOn])
+  @@index([providerId])
   @@map("vehicle_documents")
 }
 
@@ -787,9 +835,11 @@ model DeviceStatusHistory {
   reason         String?
   at             DateTime               @default(now()) @db.Timestamptz
 
-  device GpsDevice @relation(fields: [deviceId], references: [id])
+  device     GpsDevice @relation(fields: [deviceId], references: [id])
+  providerId String    @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, deviceId, at(sort: Desc)])
+  @@index([providerId])
   @@map("device_status_history")
 }
 
@@ -821,9 +871,11 @@ model ConsentRecord {
   deviceId       String?  @map("device_id") @db.Uuid
   acceptedAt     DateTime @default(now()) @map("accepted_at") @db.Timestamptz
 
-  notice ConsentNotice @relation(fields: [noticeId], references: [id])
+  notice     ConsentNotice @relation(fields: [noticeId], references: [id])
+  providerId String        @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, acceptedAt(sort: Desc)])
+  @@index([providerId])
   @@map("consent_records")
 }
 
@@ -840,8 +892,89 @@ model DeviceSupportRequest {
   resolutionNote   String?              @map("resolution_note")
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
   resolvedAt       DateTime?            @map("resolved_at") @db.Timestamptz
+  providerId       String               @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([providerId])
   @@map("device_support_requests")
+}
+
+// [T] A GPS tracking provider's registration, lifecycle and public branding (one row per PROVIDER organization). ADR-0010.
+model ProviderProfile {
+  organizationId     String         @id @map("organization_id") @db.Uuid
+  status             ProviderStatus @default(PENDING_VERIFICATION)
+  companyName        String         @map("company_name")
+  registrationNumber String?        @map("registration_number")
+  tin                String?
+  contactName        String         @map("contact_name")
+  contactEmail       String         @map("contact_email")
+  contactPhone       String?        @map("contact_phone")
+  expectedDevices    Int?           @map("expected_devices")
+  licenceNumber      String?        @map("licence_number")
+  approvedByUserId   String?        @map("approved_by_user_id") @db.Uuid
+  approvedAt         DateTime?      @map("approved_at") @db.Timestamptz
+  rejectedAt         DateTime?      @map("rejected_at") @db.Timestamptz
+  rejectionReason    String?        @map("rejection_reason")
+  suspendedAt        DateTime?      @map("suspended_at") @db.Timestamptz
+  suspensionReason   String?        @map("suspension_reason")
+  termsVersion       String?        @map("terms_version")
+  termsAcceptedAt    DateTime?      @map("terms_accepted_at") @db.Timestamptz
+  slug               String?        @unique
+  displayName        String?        @map("display_name")
+  primaryColor       String?        @map("primary_color") @db.Char(7)
+  accentColor        String?        @map("accent_color") @db.Char(7)
+  logoUrl            String?        @map("logo_url")
+  supportPhone       String?        @map("support_phone")
+  supportEmail       String?        @map("support_email")
+  supportWhatsapp    String?        @map("support_whatsapp")
+  websiteUrl         String?        @map("website_url")
+  termsUrl           String?        @map("terms_url")
+  privacyUrl         String?        @map("privacy_url")
+  showPoweredBy      Boolean        @default(true) @map("show_powered_by")
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("provider_profiles")
+}
+
+// [T] Limits a provider sets for one end customer within its own plan (effective = plan ∩ limit; enforced from M10).
+// enabled null = inherit; limitValue null = no limit set at this level.
+model CustomerEntitlement {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  providerId     String   @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
+  key            String
+  enabled        Boolean?
+  limitValue     Int?     @map("limit_value")
+  updatedBy      String?  @map("updated_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([providerId])
+  @@map("customer_entitlements")
+}
+
+// [T] The customers a scoped provider staff member may act for (organization_members.scoped_to_customers = true).
+model MemberCustomerScope {
+  id                     String   @id @default(uuid()) @db.Uuid
+  organizationId         String   @map("organization_id") @db.Uuid
+  providerId             String   @default(dbgenerated("app_null_uuid()")) @map("provider_id") @db.Uuid
+  memberId               String   @map("member_id") @db.Uuid
+  customerOrganizationId String   @map("customer_organization_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  member   OrganizationMember @relation(fields: [organizationId, memberId], references: [organizationId, id], onDelete: Cascade, map: "member_customer_scopes_member_fkey")
+  customer Organization       @relation(fields: [customerOrganizationId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, customerOrganizationId])
+  @@index([providerId])
+  @@index([organizationId])
+  @@map("member_customer_scopes")
 }

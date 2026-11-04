@@ -1,4 +1,29 @@
-import { Activity, BookOpen, Building2, Car, Cpu, FileText, IdCard, LayoutDashboard, LifeBuoy, Map as MapIcon, ShieldCheck, Users, Wrench, type LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Building2,
+  Car,
+  CreditCard,
+  Cpu,
+  FileText,
+  Eye,
+  Palette,
+  Store,
+  IdCard,
+  LayoutDashboard,
+  LifeBuoy,
+  Map as MapIcon,
+  Navigation,
+  Radar,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
 import { P } from '@gps/shared';
 import type { MessageKey } from './i18n';
 
@@ -16,8 +41,7 @@ export interface NavGroup {
 }
 
 /**
- * Customer navigation. Spec §12 lists the full sidebar (Fleet, Security, Analytics, Business, ...);
- * entries are added here as the milestone that makes each page work lands — no dead links.
+ * Customer navigation matching Aegis Fleet DESIGN_PROMPT.md & design_references/01..07.
  */
 export const customerNav: NavGroup[] = [
   { label: 'nav.overview', items: [{ label: 'nav.dashboard', path: '/app', icon: LayoutDashboard, end: true }] },
@@ -28,8 +52,23 @@ export const customerNav: NavGroup[] = [
       { label: 'nav.vehicles', path: '/app/vehicles', icon: Car, permission: P.VEHICLES_READ },
       { label: 'nav.drivers', path: '/app/drivers', icon: IdCard, permission: P.DRIVERS_READ },
       { label: 'nav.devices', path: '/app/devices', icon: Cpu, permission: P.DEVICES_READ },
-      // Diagnostics for the position pipeline (M3a): the raw feed, alert rules and thresholds. Not part of the product's tracking UI.
-      { label: 'nav.monitor', path: '/app/monitor', icon: Activity, permission: P.TRACKING_LIVE_VIEW },
+      { label: 'nav.trips', path: '/app/trips', icon: Navigation, permission: P.TRACKING_LIVE_VIEW },
+      { label: 'nav.geofences', path: '/app/geofences', icon: Radar, permission: P.TRACKING_LIVE_VIEW },
+    ],
+  },
+  {
+    label: 'nav.safety',
+    items: [
+      { label: 'nav.alerts', path: '/app/alerts', icon: Bell, permission: P.ALERTS_READ },
+      { label: 'nav.security', path: '/app/security', icon: ShieldAlert, permission: P.VEHICLES_READ },
+      { label: 'nav.deviceHealth', path: '/app/device-health', icon: Activity, permission: P.DEVICES_READ },
+    ],
+  },
+  {
+    label: 'nav.analytics',
+    items: [
+      { label: 'nav.reports', path: '/app/reports', icon: BarChart3, permission: P.VEHICLES_READ },
+      { label: 'nav.maintenance', path: '/app/maintenance', icon: Wrench, permission: P.VEHICLES_READ },
     ],
   },
   {
@@ -37,13 +76,41 @@ export const customerNav: NavGroup[] = [
     items: [
       { label: 'nav.organization', path: '/app/settings/organization', icon: Building2, permission: P.ORGANIZATION_READ },
       { label: 'nav.users', path: '/app/settings/users', icon: Users, permission: P.USERS_READ },
+      { label: 'nav.accessLog', path: '/app/settings/access-log', icon: Eye, permission: P.ORGANIZATION_ACCESS_LOG_READ },
+      { label: 'nav.billing', path: '/app/billing', icon: CreditCard, permission: P.ORGANIZATION_READ },
+      { label: 'nav.preferences', path: '/app/settings', icon: Settings, permission: P.ORGANIZATION_READ },
+    ],
+  },
+];
+
+/** The provider console: a GPS tracking business running its customers (spec Module 17). */
+export const providerNav: NavGroup[] = [
+  { label: 'nav.provider', items: [{ label: 'nav.dashboard', path: '/provider', icon: LayoutDashboard, end: true }] },
+  {
+    label: 'nav.fleet',
+    items: [
+      { label: 'nav.customers', path: '/provider/customers', icon: Store, permission: P.PROVIDER_CUSTOMERS_READ },
+      { label: 'nav.providerFleet', path: '/provider/fleet', icon: MapIcon, permission: P.PROVIDER_CUSTOMERS_VIEW_DATA },
+    ],
+  },
+  {
+    label: 'nav.settings',
+    items: [
+      { label: 'nav.providerStaff', path: '/provider/staff', icon: Users, permission: P.USERS_READ },
+      { label: 'nav.branding', path: '/provider/branding', icon: Palette, permission: P.PROVIDER_BRANDING_MANAGE },
     ],
   },
 ];
 
 /** Platform administration has its own navigation and permissions (spec §7, §12). */
 export const adminNav: NavGroup[] = [
-  { label: 'nav.platform', items: [{ label: 'nav.dashboard', path: '/admin', icon: ShieldCheck, end: true }] },
+  {
+    label: 'nav.platform',
+    items: [
+      { label: 'nav.dashboard', path: '/admin', icon: ShieldCheck, end: true },
+      { label: 'nav.providers', path: '/admin/providers', icon: Store, permission: P.PLATFORM_PROVIDERS_READ },
+    ],
+  },
   {
     label: 'nav.deviceTools',
     items: [

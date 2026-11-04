@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/primitives';
 import { useAuthStore } from '@/lib/auth-store';
-import { activeMembership, homePathFor } from '@/lib/session';
+import { activeOrganization, homePathFor } from '@/lib/session';
 
 export function Booting() {
   return (
@@ -32,18 +32,18 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-/** Customer area: needs an active customer/reseller organization. Platform staff are sent to /admin. */
-export function RequireCustomerOrg() {
+/** Each area is for one kind of organization; anyone else is sent to their own home (navigation guards only — the API enforces everything). */
+function RequireOrgType({ type }: { type: 'CUSTOMER' | 'PROVIDER' | 'PLATFORM' }) {
   const me = useAuthStore((s) => s.me);
-  const membership = activeMembership(me);
-  if (!membership) return <Navigate to="/onboarding" replace />;
-  if (membership.organization.type === 'PLATFORM') return <Navigate to="/admin" replace />;
+  const org = activeOrganization(me);
+  if (!org) return <Navigate to="/onboarding" replace />;
+  if (org.type !== type) return <Navigate to={homePathFor(me)} replace />;
   return <Outlet />;
 }
 
-/** Platform admin area (navigation guard only — the API enforces platform permissions). */
-export function RequirePlatformOrg() {
-  const membership = activeMembership(useAuthStore((s) => s.me));
-  if (membership?.organization.type !== 'PLATFORM') return <Navigate to="/app" replace />;
-  return <Outlet />;
-}
+/** End-customer app (including provider staff acting for a customer). */
+export const RequireCustomerOrg = () => <RequireOrgType type="CUSTOMER" />;
+/** Provider console. */
+export const RequireProviderOrg = () => <RequireOrgType type="PROVIDER" />;
+/** Platform admin area. */
+export const RequirePlatformOrg = () => <RequireOrgType type="PLATFORM" />;

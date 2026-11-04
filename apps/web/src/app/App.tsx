@@ -11,6 +11,12 @@ import { AdminHomePage } from '@/features/organization/AdminHomePage';
 import { DashboardPage } from '@/features/organization/DashboardPage';
 import { AdminDeviceDetailPage, AdminDevicesPage } from '@/features/admin/AdminDevicesPage';
 import { CataloguePage } from '@/features/admin/CataloguePage';
+import { ProvidersPage } from '@/features/admin/ProvidersPage';
+import { AccessLogPage } from '@/features/organization/AccessLogPage';
+import { BrandingPage } from '@/features/provider/BrandingPage';
+import { CustomersPage } from '@/features/provider/CustomersPage';
+import { ProviderFleetPage } from '@/features/provider/ProviderFleetPage';
+import { ProviderHomePage } from '@/features/provider/ProviderHomePage';
 import { ConsentNoticesPage, SupportRequestsPage } from '@/features/admin/SupportAndConsentPages';
 import { AddDevicePage } from '@/features/devices/AddDevicePage';
 import { DeviceDetailPage } from '@/features/devices/DeviceDetailPage';
@@ -20,12 +26,23 @@ import { VehicleDetailPage } from '@/features/fleet/VehicleDetailPage';
 import { VehiclesPage } from '@/features/fleet/VehiclesPage';
 import { LivePage } from '@/features/live/LivePage';
 import { MonitorPage } from '@/features/monitor/MonitorPage';
+import {
+  AlertsEventsPage,
+  BillingPage,
+  DeviceHealthPage,
+  GeneralSettingsPage,
+  GeofencesPage,
+  MaintenancePage,
+  ReportsAnalyticsPage,
+  TripsPlaybackPage,
+  VehicleSecurityPage,
+} from '@/features/operations/AegisModules';
 import { OnboardingPage } from '@/features/organization/OnboardingPage';
 import { OrganizationSettingsPage } from '@/features/organization/OrganizationSettingsPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { useAuthStore } from '@/lib/auth-store';
 import { bootstrapSession, homePathFor } from '@/lib/session';
-import { Booting, PublicOnly, RequireAuth, RequireCustomerOrg, RequirePlatformOrg } from './guards';
+import { Booting, PublicOnly, RequireAuth, RequireCustomerOrg, RequirePlatformOrg, RequireProviderOrg } from './guards';
 
 function NotFound() {
   return (
@@ -84,9 +101,29 @@ export function App() {
               <Route path="devices" element={<DevicesPage />} />
               <Route path="devices/new" element={<AddDevicePage />} />
               <Route path="devices/:deviceId" element={<DeviceDetailPage />} />
+              <Route path="trips" element={<TripsPlaybackPage />} />
+              <Route path="geofences" element={<GeofencesPage />} />
+              <Route path="alerts" element={<AlertsEventsPage />} />
+              <Route path="security" element={<VehicleSecurityPage />} />
+              <Route path="device-health" element={<DeviceHealthPage />} />
+              <Route path="reports" element={<ReportsAnalyticsPage />} />
+              <Route path="maintenance" element={<MaintenancePage />} />
               <Route path="monitor" element={<MonitorPage />} />
+              <Route path="billing" element={<BillingPage />} />
+              <Route path="settings" element={<GeneralSettingsPage />} />
               <Route path="settings/organization" element={<OrganizationSettingsPage />} />
               <Route path="settings/users" element={<UsersPage />} />
+              <Route path="settings/access-log" element={<AccessLogPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<RequireProviderOrg />}>
+            <Route path="/provider" element={<Shell variant="provider" />}>
+              <Route index element={<ProviderHomePage />} />
+              <Route path="customers" element={<CustomersPage />} />
+              <Route path="fleet" element={<ProviderFleetPage />} />
+              <Route path="staff" element={<UsersPage title="Staff & permissions" />} />
+              <Route path="branding" element={<BrandingPage />} />
             </Route>
           </Route>
 
@@ -94,6 +131,7 @@ export function App() {
             <Route path="/admin" element={<Shell variant="admin" />}>
               <Route index element={<AdminHomePage />} />
               <Route path="staff" element={<UsersPage title="Staff & permissions" />} />
+              <Route path="providers" element={<ProvidersPage />} />
               <Route path="catalogue" element={<CataloguePage />} />
               <Route path="devices" element={<AdminDevicesPage />} />
               <Route path="devices/:deviceId" element={<AdminDeviceDetailPage />} />

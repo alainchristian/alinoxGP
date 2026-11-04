@@ -30,17 +30,25 @@ export function AdminDevicesPage() {
   return (
     <>
       <PageHeader title="Devices" description="Every device on the platform, across organizations. Open one to see why it may not be communicating." />
-      <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-          <div className="relative min-w-52 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-faint" aria-hidden />
-            <Input aria-label="Search devices" placeholder="Search identifier, name or serial number" className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+      <Card className="overflow-hidden">
+        <div className="space-y-3 border-b border-border/80 px-6 pt-5 pb-4">
+          <div>
+            <h2 className="text-[16px] font-bold tracking-tight text-text">Platform device inventory</h2>
+            <p className="text-xs text-text-muted">Filter by identifier, lifecycle state or onboarding delay</p>
           </div>
-          <Select aria-label="Lifecycle status" className="w-52" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-            <option value="">Any lifecycle status</option>
-            {DEVICE_LIFECYCLE_STATUSES.map((s) => <option key={s} value={s}>{LIFECYCLE_LABEL[s]}</option>)}
-          </Select>
-          <label className="flex cursor-pointer items-center gap-2 text-[13px]"><input type="checkbox" className="size-4" checked={stuck} onChange={(e) => { setStuck(e.target.checked); setPage(1); }} /> Waiting over 24 h for a first signal</label>
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <div className="relative min-w-52 flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-text-faint" aria-hidden />
+              <Input aria-label="Search devices" placeholder="Search identifier, name or serial number" className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            </div>
+            <Select aria-label="Lifecycle status" className="w-52 bg-surface" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+              <option value="">Any lifecycle status</option>
+              {DEVICE_LIFECYCLE_STATUSES.map((s) => <option key={s} value={s}>{LIFECYCLE_LABEL[s]}</option>)}
+            </Select>
+            <label className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5 h-10 text-xs font-medium text-text hover:bg-surface-2">
+              <input type="checkbox" className="size-4 accent-brand" checked={stuck} onChange={(e) => { setStuck(e.target.checked); setPage(1); }} /> Waiting over 24 h for a first signal
+            </label>
+          </div>
         </div>
         {devices.isPending ? (
           <div className="space-y-2 p-5"><Skeleton className="h-8" /><Skeleton className="h-8" /></div>

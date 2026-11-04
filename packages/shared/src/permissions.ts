@@ -8,6 +8,8 @@ export const P = {
   ORGANIZATION_READ: 'organization.read',
   ORGANIZATION_UPDATE: 'organization.update',
   ORGANIZATION_TRANSFER_OWNERSHIP: 'organization.transfer_ownership',
+  /** Who at the provider or platform looked at this organization's data (owner only). */
+  ORGANIZATION_ACCESS_LOG_READ: 'organization.access_log.read',
   // Users & roles
   USERS_READ: 'users.read',
   USERS_INVITE: 'users.invite',
@@ -49,13 +51,14 @@ export const P = {
   // Reports
   REPORTS_VIEW: 'reports.view',
   REPORTS_EXPORT: 'reports.export',
-  // Billing
-  BILLING_READ: 'billing.read',
-  BILLING_MANAGE: 'billing.manage',
   // Integrations
   INTEGRATIONS_MANAGE: 'integrations.manage',
   API_KEYS_MANAGE: 'api_keys.manage',
   // Platform
+  PLATFORM_PROVIDERS_READ: 'platform.providers.read',
+  PLATFORM_PROVIDERS_APPROVE: 'platform.providers.approve',
+  PLATFORM_PROVIDERS_MANAGE: 'platform.providers.manage',
+  PLATFORM_PROVIDERS_SUSPEND: 'platform.providers.suspend',
   PLATFORM_CUSTOMERS_READ: 'platform.customers.read',
   PLATFORM_CUSTOMERS_MANAGE: 'platform.customers.manage',
   PLATFORM_CUSTOMERS_SUSPEND: 'platform.customers.suspend',
@@ -68,11 +71,20 @@ export const P = {
   PLATFORM_SUPPORT_ACCESS: 'platform.support.access',
   PLATFORM_AUDIT_READ: 'platform.audit.read',
   PLATFORM_SETTINGS_MANAGE: 'platform.settings.manage',
-  // Reseller
-  RESELLER_CUSTOMERS_READ: 'reseller.customers.read',
-  RESELLER_CUSTOMERS_MANAGE: 'reseller.customers.manage',
-  RESELLER_DEVICES_ASSIGN: 'reseller.devices.assign',
-  RESELLER_BRANDING_MANAGE: 'reseller.branding.manage',
+  // GPS provider (our paying customer; serves its own end customers) — see gps-provider-model
+  PROVIDER_CUSTOMERS_READ: 'provider.customers.read',
+  PROVIDER_CUSTOMERS_MANAGE: 'provider.customers.manage',
+  PROVIDER_CUSTOMERS_SUSPEND: 'provider.customers.suspend',
+  PROVIDER_CUSTOMERS_LIMITS_MANAGE: 'provider.customers.limits.manage',
+  /** Live view / history of customers' vehicles at provider level. Every use is audit-logged. */
+  PROVIDER_CUSTOMERS_VIEW_DATA: 'provider.customers.view_data',
+  PROVIDER_DEVICES_REGISTER: 'provider.devices.register',
+  PROVIDER_DEVICES_ASSIGN: 'provider.devices.assign',
+  PROVIDER_DEVICES_DIAGNOSE: 'provider.devices.diagnose',
+  PROVIDER_STAFF_MANAGE: 'provider.staff.manage',
+  PROVIDER_BRANDING_MANAGE: 'provider.branding.manage',
+  PROVIDER_BILLING_READ: 'provider.billing.read',
+  PROVIDER_ALERTS_READ: 'provider.alerts.read',
 } as const;
 
 export type PermissionKey = (typeof P)[keyof typeof P];
@@ -80,12 +92,15 @@ export type PermissionKey = (typeof P)[keyof typeof P];
 export const ALL_PERMISSIONS: readonly PermissionKey[] = Object.values(P);
 
 const isPlatform = (k: string) => k.startsWith('platform.');
-const isReseller = (k: string) => k.startsWith('reseller.');
+const isProvider = (k: string) => k.startsWith('provider.');
 
-/** Permissions that make sense inside a customer organization. */
+/** Permissions that make sense inside a customer organization (end customers have no billing: they do not pay the platform). */
 export const ORGANIZATION_PERMISSIONS: readonly PermissionKey[] = ALL_PERMISSIONS.filter(
-  (k) => !isPlatform(k) && !isReseller(k),
+  (k) => !isPlatform(k) && !isProvider(k),
 );
+
+/** Permissions that make sense inside a provider organization (its own staff, users and branding, plus provider-level operations). */
+export const PROVIDER_PERMISSIONS: readonly PermissionKey[] = ALL_PERMISSIONS.filter(isProvider);
 
 /** Actions that require step-up authentication (fresh password/TOTP within 5 minutes). */
 export const STEP_UP_WINDOW_SECONDS = 300;

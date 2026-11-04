@@ -15,20 +15,29 @@ import type { Server, Socket } from 'socket.io';
 import { P } from '@gps/shared';
 import { isUuid } from '../../common/mappers';
 import { ENV, type Env } from '../../infrastructure/config/env';
-import { TenantPrismaService } from '../../infrastructure/prisma/prisma.service';
+import { SystemPrismaService, TenantPrismaService } from '../../infrastructure/prisma/prisma.service';
 import { REDIS } from '../../infrastructure/redis/redis.module';
 import { AccessService } from '../access-control/access.service';
+import { ProviderAccessLogService } from '../access-control/provider-access-log.service';
 import { SessionService } from '../auth/session.service';
 
 export const SOCKET_PATH = '/api/v1/socket';
 export const orgRoom = (orgId: string) => `org:${orgId}`;
+/** All customers of one provider (provider staff with unrestricted scope). */
+export const providerRoom = (providerId: string) => `provider:${providerId}`;
 export const vehicleRoom = (orgId: string, vehicleId: string) => `org:${orgId}:vehicle:${vehicleId}`;
 
 interface SocketIdentity {
   userId: string;
   sessionId: string;
   organizationId: string;
+  /** Rooms this socket may be in: its organization, or (provider staff) the provider room / the rooms of their scoped customers. */
+  rooms: string[];
+  /** Changes when the staff member's customer scope changes: such a socket is dropped and must reconnect. */
+  scopeKey: string;
 }
+
+const scopeKeyOf = (scope: 'ALL' | readonly string[]) => (scope === 'ALL' ? 'ALL' : [...scope].sort().join(','));
 
 /**
  * Live updates to browsers (skill gps-tenant-isolation §5, gps-position-pipeline §6).
@@ -60,7 +69,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnAp
     private readonly tenant: TenantPrismaService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
+    private readonly accessLog: ProviderAccessLogService,
+    private readonly system: SystemPrismaService,
   ) {}
+
+  /** Ids of a provider's customers (for the access log of a provider-wide view). */
+  private async customerIds(providerId: string): Promise<string[]> {
+    const rows = await this.system.organization.findMany({ where: { providerId, type: 'CUSTOMER' }, select: { id: true } });
+    return rows.map((r) => r.id);
+  }
 
   afterInit(server: Server) {
     // Dedicated connections with the DEFAULT options: the shared client is configured to fail fast (no offline queue),
@@ -95,15 +112,27 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnAp
 
     const resolved = await this.access.resolve(payload.sub, auth.organizationId);
     if (!resolved || resolved.organization.status !== 'ACTIVE') throw new Error('not_found');
-    if (!resolved.permissions.has(P.TRACKING_LIVE_VIEW)) throw new Error('forbidden');
+    const org = resolved.organization;
+    let rooms: string[];
+    if (org.type === 'PROVIDER' && resolved.actingAs === 'MEMBER') {
+      // Provider staff watching the provider's customers (provider-wide map).
+      if (!resolved.permissions.has(P.PROVIDER_CUSTOMERS_VIEW_DATA)) throw new Error('forbidden');
+      rooms = resolved.customerScope === 'ALL' ? [providerRoom(org.id)] : resolved.customerScope.map((id) => orgRoom(id));
+      const watched = resolved.customerScope === 'ALL' ? await this.customerIds(org.id) : [...resolved.customerScope];
+      await this.accessLog.logCustomers(payload.sub, org.id, watched, 'live', 'SOCKET');
+    } else {
+      if (!resolved.permissions.has(P.TRACKING_LIVE_VIEW)) throw new Error('forbidden');
+      rooms = [orgRoom(org.id)];
+      if (resolved.actingAs === 'PROVIDER_STAFF') await this.accessLog.logCustomer(payload.sub, resolved.actorOrganizationId, org.id, 'live', 'SOCKET');
+    }
 
-    socket.data.identity = { userId: payload.sub, sessionId: payload.sid, organizationId: resolved.organization.id } satisfies SocketIdentity;
+    socket.data.identity = { userId: payload.sub, sessionId: payload.sid, organizationId: org.id, rooms, scopeKey: scopeKeyOf(resolved.customerScope) } satisfies SocketIdentity;
   }
 
   handleConnection(client: Socket) {
     const identity = client.data.identity as SocketIdentity | undefined;
     if (!identity) return client.disconnect(true); // defence in depth: middleware should have rejected already
-    void client.join(orgRoom(identity.organizationId));
+    for (const room of identity.rooms) void client.join(room);
     void this.sendEngineStatus(client);
   }
 
@@ -141,6 +170,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnAp
     this.server?.to(orgRoom(orgId)).emit(event, payload);
   }
 
+  emitToProvider(providerId: string, event: string, payload: unknown) {
+    this.server?.to(providerRoom(providerId)).emit(event, payload);
+  }
+
   emitToVehicle(orgId: string, vehicleId: string, event: string, payload: unknown) {
     this.server?.to(vehicleRoom(orgId, vehicleId)).emit(event, payload);
   }
@@ -158,7 +191,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnAp
       try {
         const revoked = await this.sessions.isRevoked(identity.sessionId);
         const resolved = revoked ? null : await this.access.resolve(identity.userId, identity.organizationId);
-        const ok = !!resolved && resolved.organization.status === 'ACTIVE' && resolved.permissions.has(P.TRACKING_LIVE_VIEW);
+        const needed = resolved?.organization.type === 'PROVIDER' && resolved.actingAs === 'MEMBER' ? P.PROVIDER_CUSTOMERS_VIEW_DATA : P.TRACKING_LIVE_VIEW;
+        const ok = !!resolved && resolved.organization.status === 'ACTIVE' && resolved.permissions.has(needed) && !resolved.providerSuspended && scopeKeyOf(resolved.customerScope) === identity.scopeKey;
         if (!ok) socket.disconnect(true);
       } catch (err) {
         this.logger.warn(`Socket re-validation failed: ${String(err)}`); // keep the socket; try again next round

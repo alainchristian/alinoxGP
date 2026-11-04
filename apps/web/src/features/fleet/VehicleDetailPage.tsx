@@ -72,7 +72,7 @@ function VehicleDetailView({ orgId, vehicleId }: { orgId: string; vehicleId: str
   const v = vehicle.data;
 
   return (
-    <>
+    <div className="space-y-5">
       <BackLink />
       <PageHeader
         title={v.registrationNumber}
@@ -82,7 +82,7 @@ function VehicleDetailView({ orgId, vehicleId }: { orgId: string; vehicleId: str
             {v.category && <Badge>{v.category.name}</Badge>}
             {isSimulatedDevice(v.device?.uniqueId) && <SimulatedBadge />}
             {hasPermission(me, P.TRACKING_LIVE_VIEW) && v.device && (
-              <Link to="/app/live" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-strong px-3 text-[13px] font-medium hover:bg-surface-2"><MapPin className="size-4" aria-hidden /> Live map</Link>
+              <Link to="/app/live" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border-strong/80 bg-surface px-3 text-[13px] font-medium text-slate-800 shadow-xs transition-colors hover:bg-surface-2"><MapPin className="size-4 text-brand" aria-hidden /> Live map</Link>
             )}
             {canUpdate && <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}><Pencil className="size-4" aria-hidden /> Edit</Button>}
             {canDelete && <Button size="sm" variant="secondary" className="text-danger" onClick={() => setDeleteOpen(true)}><Trash2 className="size-4" aria-hidden /> Delete</Button>}
@@ -91,10 +91,10 @@ function VehicleDetailView({ orgId, vehicleId }: { orgId: string; vehicleId: str
       />
       {actionError && <div className="mb-4"><Alert>{actionError}</Alert></div>}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Details" />
-          <dl className="px-5 py-3 text-[13px]">
+          <dl className="px-6 py-3 text-[13px]">
             <DetailRow label="Registration number">{v.registrationNumber}</DetailRow>
             <DetailRow label="Make">{v.make ?? '—'}</DetailRow>
             <DetailRow label="Model">{v.model ?? '—'}</DetailRow>
@@ -108,17 +108,17 @@ function VehicleDetailView({ orgId, vehicleId }: { orgId: string; vehicleId: str
           </dl>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <Card>
             <CardHeader title="Papers" description="Valid-through dates you entered. Add document records below for permits and other papers." />
-            <dl className="px-5 py-3 text-[13px]">
+            <dl className="px-6 py-3 text-[13px]">
               <DetailRow label="Insurance"><span className="inline-flex flex-wrap items-center justify-end gap-2">{v.insurance && <span className="tabular font-normal">{formatDay(v.insurance.date)}</span>}<ExpiryBadge expiry={v.insurance} /></span></DetailRow>
               <DetailRow label="Inspection"><span className="inline-flex flex-wrap items-center justify-end gap-2">{v.inspection && <span className="tabular font-normal">{formatDay(v.inspection.date)}</span>}<ExpiryBadge expiry={v.inspection} /></span></DetailRow>
             </dl>
           </Card>
           <Card>
             <CardHeader title="Tracker" />
-            <dl className="px-5 py-3 text-[13px]">
+            <dl className="px-6 py-3 text-[13px]">
               {v.device ? (
                 <>
                   <DetailRow label="Device"><span className="inline-flex items-center gap-2"><span className="tabular">{v.device.uniqueId}</span>{isSimulatedDevice(v.device.uniqueId) && <SimulatedBadge />}</span></DetailRow>
@@ -142,13 +142,13 @@ function VehicleDetailView({ orgId, vehicleId }: { orgId: string; vehicleId: str
           <Button variant="danger" loading={remove.isPending} onClick={() => remove.mutate()}>Delete vehicle</Button>
         </div>
       </Dialog>
-    </>
+    </div>
   );
 }
 
 function BackLink() {
   return (
-    <Link to="/app/vehicles" className="mb-3 inline-flex items-center gap-1 text-[13px] text-text-muted hover:text-text">
+    <Link to="/app/vehicles" className="mb-1 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted transition-colors hover:text-slate-900">
       <ArrowLeft className="size-4" aria-hidden /> Vehicles
     </Link>
   );
@@ -180,14 +180,14 @@ function DriverCard({ vehicle, orgId, timezone, onChanged }: { vehicle: VehicleD
   const unassign = useMutation({ mutationFn: () => api(`/vehicles/${vehicle.id}/driver`, { method: 'DELETE', body: {} }), onSuccess: done, onError: fail });
 
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 overflow-hidden">
       <CardHeader title="Assigned driver" description="Who this vehicle is assigned to. This is not a statement about who is driving right now." />
-      <div className="px-5 py-4 text-[13px]">
+      <div className="px-6 py-4 text-[13px]">
         {error && <div className="mb-3"><Alert>{error}</Alert></div>}
         {vehicle.driver ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">{vehicle.driver.fullName}</p>
+              <p className="text-sm font-bold text-text">{vehicle.driver.fullName}</p>
               <p className="text-text-muted">Assigned since {formatDateTime(vehicle.driver.since, timezone)}</p>
             </div>
             {canManage && <Button size="sm" variant="secondary" loading={unassign.isPending} onClick={() => unassign.mutate()}>Unassign driver</Button>}
@@ -208,23 +208,23 @@ function DriverCard({ vehicle, orgId, timezone, onChanged }: { vehicle: VehicleD
         )}
       </div>
       {canRead && (
-        <div className="border-t border-border">
-          <h3 className="px-5 pt-3 text-xs font-semibold text-text-muted">Assignment history</h3>
+        <div className="border-t border-border/70">
+          <h3 className="px-6 pt-3.5 text-xs font-bold uppercase tracking-wider text-text-muted">Assignment history</h3>
           {history.isPending ? (
-            <div className="p-5"><Skeleton className="h-8" /></div>
+            <div className="p-6"><Skeleton className="h-8" /></div>
           ) : history.isError ? (
             <QueryError query={history} what="the assignment history" />
           ) : history.data.length === 0 ? (
-            <p className="px-5 py-4 text-[13px] text-text-muted">No driver has been assigned to this vehicle yet.</p>
+            <p className="px-6 py-4 text-[13px] text-text-muted">No driver has been assigned to this vehicle yet.</p>
           ) : (
             <Table>
               <thead><tr><Th>Driver</Th><Th>From</Th><Th>Until</Th><Th>Note</Th></tr></thead>
               <tbody>
                 {history.data.map((h) => (
-                  <tr key={h.id}>
-                    <Td className="font-medium">{h.driver.fullName}</Td>
-                    <Td className="tabular">{formatDateTime(h.assignedAt, timezone)}</Td>
-                    <Td className="tabular">{h.unassignedAt ? formatDateTime(h.unassignedAt, timezone) : <Badge tone="ok">Current</Badge>}</Td>
+                  <tr key={h.id} className="transition-colors hover:bg-surface-2/70">
+                    <Td className="font-bold text-text">{h.driver.fullName}</Td>
+                    <Td className="tabular text-text-muted">{formatDateTime(h.assignedAt, timezone)}</Td>
+                    <Td className="tabular text-text-muted">{h.unassignedAt ? formatDateTime(h.unassignedAt, timezone) : <Badge tone="ok">Current</Badge>}</Td>
                     <Td className="text-text-muted">{h.reason ?? '—'}</Td>
                   </tr>
                 ))}
@@ -255,15 +255,15 @@ function DocumentsCard({ vehicleId, orgId, onChanged }: { vehicleId: string; org
   });
 
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 overflow-hidden">
       <CardHeader
         title="Documents"
         description="Records of insurance, inspection, registration and permits. The paper itself is not stored here."
         action={canManage ? <Button size="sm" onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden /> Add record</Button> : undefined}
       />
-      {error && <div className="p-4"><Alert>{error}</Alert></div>}
+      {error && <div className="px-6 pb-4"><Alert>{error}</Alert></div>}
       {docs.isPending ? (
-        <div className="p-5"><Skeleton className="h-8" /></div>
+        <div className="p-6"><Skeleton className="h-8" /></div>
       ) : docs.isError ? (
         <QueryError query={docs} what="the documents" />
       ) : docs.data.length === 0 ? (
@@ -273,11 +273,11 @@ function DocumentsCard({ vehicleId, orgId, onChanged }: { vehicleId: string; org
           <thead><tr><Th>Type</Th><Th>Title</Th><Th>Reference</Th><Th>Issued</Th><Th>Valid through</Th>{canManage && <Th className="text-right">Actions</Th>}</tr></thead>
           <tbody>
             {docs.data.map((d) => (
-              <tr key={d.id}>
+              <tr key={d.id} className="transition-colors hover:bg-surface-2/70">
                 <Td>{DOCUMENT_TYPE_LABEL[d.type]}</Td>
-                <Td className="font-medium">{d.title}</Td>
-                <Td>{d.referenceNumber ?? '—'}</Td>
-                <Td className="tabular">{formatDay(d.issuedOn)}</Td>
+                <Td className="font-bold text-text">{d.title}</Td>
+                <Td className="text-text-muted">{d.referenceNumber ?? '—'}</Td>
+                <Td className="tabular text-text-muted">{formatDay(d.issuedOn)}</Td>
                 <Td><span className="inline-flex flex-wrap items-center gap-2"><span className="tabular">{formatDay(d.expiresOn)}</span>{d.expiry && <ExpiryBadge expiry={d.expiry} />}</span></Td>
                 {canManage && (
                   <Td className="text-right">
@@ -344,7 +344,7 @@ function DocumentDialog({ vehicleId, doc, open, onOpenChange, onSaved }: { vehic
           </Field>
         </div>
         <Field label="Notes" htmlFor="doc-notes" error={errors.notes?.message}>
-          <textarea id="doc-notes" rows={2} className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text" {...register('notes')} />
+          <textarea id="doc-notes" rows={2} className="w-full rounded-[10px] border border-border bg-surface-2/80 px-3.5 py-2 text-sm text-text" {...register('notes')} />
         </Field>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>

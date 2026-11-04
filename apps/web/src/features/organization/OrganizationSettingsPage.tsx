@@ -55,14 +55,14 @@ export function OrganizationSettingsPage() {
       <Card className="max-w-xl">
         <CardHeader title="Details" />
         {org.isPending ? (
-          <div className="space-y-3 p-5"><Skeleton className="h-9" /><Skeleton className="h-9" /><Skeleton className="h-9" /></div>
+          <div className="space-y-3 p-6"><Skeleton className="h-9" /><Skeleton className="h-9" /><Skeleton className="h-9" /></div>
         ) : org.isError ? (
-          <div className="p-5"><Alert>Could not load the organization.</Alert></div>
+          <div className="p-6"><Alert>Could not load the organization.</Alert></div>
         ) : (
           <form
             onSubmit={handleSubmit((v) => { setFormError(null); setSaved(false); save.mutate(v); })}
             noValidate
-            className="space-y-4 p-5"
+            className="space-y-4 px-6 pb-6 pt-2"
           >
             {formError && <Alert>{formError}</Alert>}
             {saved && !isDirty && <Alert tone="ok">Changes saved.</Alert>}

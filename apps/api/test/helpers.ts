@@ -132,21 +132,48 @@ export async function login(ctx: TestCtx, email: string, password = PASSWORD, to
   return res;
 }
 
-/** Full public flow: register -> read email -> verify -> login. */
+/**
+ * A verified user, signed in. With `organizationName` the user is the Owner of a new CUSTOMER organization of the
+ * shared test provider. End customers cannot sign up publicly (spec Module 1), so this is a database fixture; the public
+ * provider registration flow has its own tests (see providers.e2e-spec.ts).
+ */
 export async function registerUser(
   ctx: TestCtx,
   opts: { email?: string; organizationName?: string; fullName?: string } = {},
 ): Promise<TestUser & { organizationId?: string }> {
   const email = opts.email ?? uniqueEmail();
-  const reg = await http(ctx)
-    .post(url('/auth/register'))
-    .send({ email, password: PASSWORD, fullName: opts.fullName ?? 'Test User', organizationName: opts.organizationName });
-  if (reg.status !== 201) throw new Error(`register failed: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const mail = ctx.mail.lastTo(email);
-  if (!mail) throw new Error('verification email not sent');
-  const verify = await http(ctx).post(url('/auth/verify-email')).send({ token: extractToken(mail.text) });
-  if (verify.status !== 204) throw new Error(`verify failed: ${verify.status}`);
+  const user = await ctx.users.create({
+    email,
+    passwordHash: await ctx.users.hashPassword(PASSWORD),
+    fullName: opts.fullName ?? 'Test User',
+    emailVerified: true,
+  });
+  if (opts.organizationName) {
+    const org = await createOrg(ctx, { name: opts.organizationName, type: 'CUSTOMER' });
+    const role = await ctx.system.role.findUniqueOrThrow({ where: { key: 'ORG_OWNER' } });
+    const member = await ctx.system.organizationMember.create({ data: { organizationId: org.id, userId: user.id } });
+    await ctx.system.memberRole.create({ data: { organizationId: org.id, memberId: member.id, roleId: role.id } });
+  }
   return signIn(ctx, email);
+}
+
+const testProviders = new WeakMap<TestCtx, Promise<{ id: string }>>();
+/** The provider that owns customers created by fixtures that do not name one (one per test app). */
+export function ensureTestProvider(ctx: TestCtx): Promise<{ id: string }> {
+  let p = testProviders.get(ctx);
+  if (!p) {
+    p = (async () => {
+      const org = await ctx.system.organization.create({
+        data: { name: `Test provider ${randomUUID().slice(0, 6)}`, type: 'PROVIDER', countryCode: 'RW', timezone: 'Africa/Kigali', currencyCode: 'RWF' },
+      });
+      await ctx.system.providerProfile.create({
+        data: { organizationId: org.id, status: 'ACTIVE', companyName: org.name, contactName: 'Test', contactEmail: uniqueEmail('prov'), termsVersion: 'test', termsAcceptedAt: new Date() },
+      });
+      return org;
+    })();
+    testProviders.set(ctx, p);
+  }
+  return p;
 }
 
 export async function signIn(ctx: TestCtx, email: string, password = PASSWORD): Promise<TestUser & { organizationId?: string }> {
@@ -172,11 +199,13 @@ export async function createOrg(
   ctx: TestCtx,
   opts: { name?: string; type?: OrganizationType; parentOrganizationId?: string } = {},
 ) {
+  const type = opts.type ?? 'CUSTOMER';
+  const parentOrganizationId = opts.parentOrganizationId ?? (type === 'CUSTOMER' ? (await ensureTestProvider(ctx)).id : undefined);
   return ctx.system.organization.create({
     data: {
       name: opts.name ?? `Org ${randomUUID().slice(0, 6)}`,
-      type: opts.type ?? 'CUSTOMER',
-      parentOrganizationId: opts.parentOrganizationId,
+      type,
+      parentOrganizationId,
       countryCode: 'RW',
       timezone: 'Africa/Kigali',
       currencyCode: 'RWF',

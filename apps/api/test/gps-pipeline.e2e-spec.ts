@@ -282,7 +282,7 @@ describe('GPS pipeline against a real Traccar (e2e)', () => {
       // A normal (non-simulated) identifier: simulated ids hit their own, earlier, 422 in non-sandbox organizations.
       const taken = `TAKEN${RUN}-IMEI`;
       createdUniqueIds.push(taken);
-      const first = await api.post('/devices', owner, { uniqueId: taken });
+      const first = await api.post('/devices', ownerA, { uniqueId: taken }); // a real identifier needs a non-sandbox organization
       expect(first.status).toBe(201);
       const dup = await api.post('/devices', ownerB, { uniqueId: taken });
       expect(dup.status).toBe(409);

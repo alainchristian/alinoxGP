@@ -25,7 +25,6 @@ import {
   ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
-  RegisterDto,
   ResendVerificationDto,
   ResetPasswordDto,
   StepUpDto,
@@ -57,14 +56,6 @@ export class AuthController {
 
   private clearRefreshCookie(res: Response) {
     res.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH, httpOnly: true, sameSite: 'strict' });
-  }
-
-  @Post('register')
-  @Public()
-  @Throttle(AUTH_THROTTLE)
-  async register(@Body() body: RegisterDto) {
-    await this.auth.register(body);
-    return { message: 'If the address can be registered, a verification email has been sent.' };
   }
 
   @Post('login')

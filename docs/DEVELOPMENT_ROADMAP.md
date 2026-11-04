@@ -14,7 +14,30 @@ Phase 0 deliverable — 2026-11-01 — aligned with spec §17.4 (milestones are 
 | M4 — Live tracking | **Approved by the owner (2026-11-02)** with the open development map; the Mapbox renderer waits for a token (OQ-034). See "M4 as built". |
 | **M5a — Vehicles, drivers, categories, documents, real dashboard** | **Approved by the owner (2026-11-02)** after the status counts and latest alerts were added to the dashboard. See "M5a as built". |
 | **M5b — Device catalogue, capabilities, onboarding, diagnostics, consent records** | **In progress (started 2026-11-02, after M5a approval).** Original note:  (owner split M5 on 2026-11-02; needs the physical test devices and OQ-018 / OQ-020 / OQ-024; starts after M5a is approved) |
-| M6 – M10 | Not started |
+| **M1b — Provider hierarchy retrofit** | **Implemented and verified with the simulator (2026-11-04); awaiting owner review.** Slices 1–4 done, slice 5 (isolation proof) done for everything that exists. See "M1b as built". Provider-wide live map UI deferred (OQ-040). |
+| M6 – M11 | Not started (**milestone numbers changed on 2026-11-04**: new M9 = speed governor compliance; old M9 → M10 installations/provider billing/platform admin; old M10 → M11 scale proof (M3b) + production) |
+
+### M1b plan (2026-11-04) — provider hierarchy retrofit
+
+**Why.** `docs/PROJECT_SPEC.md` rev. 1.2 (starter pack of 2026-11-04) makes the platform's paying customers **GPS tracking providers** who serve their own end customers; M1 now includes provider self-registration and approval, provider staff, customers created and invited by the provider, per-customer limits and basic branding. What M1 built was the earlier reseller model (read-only access to child customers, public organization creation). M2–M5b (device pipeline, live state, catalogue, vehicles) are compatible and stay.
+**Decisions:** ADR-0010 (dual-key tenancy: `organization_id` + `provider_id` on every tenant row, filled and checked by the database; RLS with a customer-level and a provider-level setting).
+**Slices** (each ends with typecheck, lint, tests):
+1. **M1b-1 Database + tenancy core:** `RESELLER` → `PROVIDER`; `organizations.provider_id`; `provider_profiles` (lifecycle, registration data, terms acceptance); `provider_id` on every tenant table (trigger-filled, consistency-checked, backfilled); RLS policies with `app.current_provider_id`; `TenantContext` with levels; `TenantContextGuard` (customer via `X-Organization-Id`, provider staff acting on a customer via the path/`X-Customer-Id`, scope check); provider permissions and roles; platform provider permissions.
+2. **M1b-2 Provider lifecycle + customers:** public provider registration (email-verified), platform approval/rejection/suspension, sandbox-only before approval, terms acceptance record; provider creates customers, invites their users, suspends/reactivates a customer, sets per-customer limits (stored; enforcement arrives with entitlements in M10); public organization creation removed; provider-staff access log visible to the customer's owner; branding data + public `GET /branding/resolve`.
+3. **M1b-3 Provider reach into existing data:** provider-level vehicles/devices/alerts/live snapshot across its customers (scoped staff honoured), provider socket room, device registration by a provider (stock, then assigned to a customer's vehicle).
+4. **M1b-4 Web:** provider console shell (customers, create/invite, staff, branding, devices, all-customers live map), provider registration page, platform admin provider approvals, provider-branded login and theme variables.
+5. **M1b-5 Isolation proof:** new fixture (P1 with C1, C2, a staff member scoped to C1; P2 with C3) and the tests of `gps-tenant-isolation` §7 for every endpoint that exists; docs updated.
+### M1b as built (2026-11-04)
+
+- **Tenancy (ADR-0010):** PROVIDER replaces RESELLER; `provider_id` on every tenant row filled and checked by the database; RLS with a customer key and a provider key; `TenantContext` with `actingAs` MEMBER | PROVIDER_STAFF and a customer scope; provider staff act for a customer with permissions derived from their role (never security commands, ownership, roles) and every access lands in the customer's access log (owner-only). Found by the tests: a staff-scope filter that overwrote the customer id in a query (fixed, covered).
+- **Provider lifecycle:** public registration (email-verified, terms version recorded), platform approve/reject/suspend/reactivate with step-up and a lifecycle table; sandbox-only before approval (real devices refused in sandbox organizations); suspended provider → customers see a neutral message, ingestion continues.
+- **Provider console:** customers (create + owner invitation, suspend/reactivate, per-customer limits stored), staff scope API, branding (colours, name, support contacts, sign-in address; public resolve with neutral fallback), all-vehicles list. Web: provider console shell, registration page, platform Providers page, customer access-log page, provider-branded login and theme.
+- **Real-time:** provider room `provider:<id>` (scoped staff get per-customer rooms; dropped when their scope changes), fan-out via an in-memory organization→provider directory.
+- **Evidence:** typecheck, lint pass; shared 98, web 152, API unit 100 and e2e 256 tests pass (new: providers 34, provider-live 7); migrations in sync (`migrate diff` empty); steady-traffic smoke test passes (hit rate 91.7 %, p95 position-to-socket 977 ms, no errors); browser: register → verify → sign in → approve (step-up) → create customer → open it as staff (banner) on the dev stack.
+- **Not verified:** phone/tablet layouts of the new pages, branding and access-log pages in a browser, hosted behaviour of `<slug>.domain` addresses, staff-scope UI (API only). `traccar.stream.spec` (reconnect) failed once under full-suite load and passed twice alone: flaky, not investigated.
+- **Deviations:** none from the spec. Decisions needing the owner: OQ-038/039/040.
+
+**Out of scope here:** provider billing and plans (M10), customer transfer between providers (M10), regulator organization (M9), bulk CSV device import (follows slice 3 if time allows, otherwise M5-style follow-up), custom domains.
 
 ### M5b plan (2026-11-02) — catalogue, capabilities, onboarding, diagnostics, consent
 
@@ -207,11 +230,15 @@ Per `docs/VEHICLE_SECURITY.md`: capability gating; precondition gate (pure funct
 In-app and email notifications with queues/retries/cooldown; SMS & WhatsApp ports (disabled adapters); all reports; PDF/XLSX/CSV exports through signed URLs; Recharts visuals from real data only.
 **Exit:** alerts reach users via configured channels; exports correct against known simulator data.
 
-### M9 — Installations, subscriptions, payments, resellers  (XL)
-Inventory & installation workflow (statuses per spec) with technician completion record and admin verification; plans/entitlements as data; subscriptions lifecycle (trial, grace, expiry, upgrade/downgrade); payment providers behind port (sandbox) with verified, idempotent webhooks; invoices/reminders; customer administration; reseller portal and isolation (OQ-023).
-**Exit:** customer subscribes and pays in provider sandbox; reseller manages only own customers (isolation tests).
+### M9 — Speed governor compliance  (XL) — NEW (spec Module 18, rev. 1.2)
+Governor installation records (set speed, RURA sticker, seal, calibration, warranty, six-monthly inspections with reminders); ≤ 5 s speed records retained and retrievable; violation and tamper detection with real-time alarms to the provider; automated SMS on device offline; quarterly online/offline report; read-only Regulator portal (`REGULATOR` organization type); regulator transmission outbox with a labelled development adapter until RURA's interface and Annex A are obtained (spec B13–B16); compliance pack; simulator governor scenarios. Needs SMS and reports from M8; the owner may move it ahead of M7 if a governor supplier is the first committed customer.
+**Exit:** see spec §17.4 M9 row.
 
-### M10 — Production and launch  (L)
+### M10 — Installations, provider billing, platform administration  (XL) — was M9
+Provider inventory & installation workflow with technician completion record and verification; provider plans/entitlements as data (incl. the speed-governor add-on); active-device usage metering with explainable statements; payment gateways (MTN MoMo / Flutterwave sandbox) with verified, idempotent webhooks and reconciliation; invoices, reminders, grace and suspension; provider management in platform admin; customer transfer between providers.
+**Exit:** a provider's monthly invoice matches its active devices, is paid in a sandbox, and late payment follows the documented grace/suspension behaviour without data loss.
+
+### M11 — Scale proof and production launch  (L) — was M10
 **Prerequisite (owner decision 2026-11-02): M3b** — the 200 positions/s proof, Traccar report latency and RLS overhead on a separate Linux host — must be done before M10 and may be done earlier.
 Production compose, Nginx, TLS, firewall for device ports, backups + restore drill, monitoring/error tracking, security review (incl. auth rotation/reuse, RLS, secrets), load test and documented results, deployment runbooks, privacy notice/ToS (OQ-028), hosting decision (OQ-001/021).
 **Exit:** deployed with runbooks; Success Milestone 2 achieved if not earlier.

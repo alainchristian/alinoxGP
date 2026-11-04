@@ -5,7 +5,7 @@ description: Backend conventions for the GPS fleet platform's NestJS API and Pri
 
 # API and database conventions
 
-Consistency matters more than any single choice here: a fleet platform ends up with 150+ endpoints, and clients (our web app, resellers' integrations, future mobile apps) depend on them behaving alike. Items marked *(default)* are recommended starting choices — confirm or change them in a Phase 0 ADR, then follow the ADR.
+Consistency matters more than any single choice here: a fleet platform ends up with 150+ endpoints, and clients (our web app's three shells, GPS providers' integrations, future mobile apps) depend on them behaving alike. Items marked *(default)* are recommended starting choices — confirm or change them in a Phase 0 ADR, then follow the ADR.
 
 ## 1. Module anatomy
 
@@ -28,7 +28,9 @@ Guards run in this order on every protected route:
 
 1. `ThrottlerGuard` — rate limit (stricter on auth and command routes).
 2. `JwtAuthGuard` — authenticates; attaches `user`.
-3. `TenantContextGuard` — resolves the active organization and verifies membership (see `gps-tenant-isolation`).
+3. `TenantContextGuard` — resolves the tenant level (customer / provider / platform), active organization, `X-Customer-Id` for provider staff, and verifies membership and scope (see `gps-tenant-isolation`).
+
+Route prefixes by audience: `/api/v1/...` (end-customer and shared resources), `/api/v1/provider/...` (provider console), `/api/v1/admin/...` (platform staff). A route's prefix must match the roles allowed on it; a test enumerates routes and checks this. "Provider" in names always means a GPS provider; external services are "gateways".
 4. `PermissionsGuard` — `@RequirePermissions('vehicles.update')` (see `gps-rbac-permissions`).
 5. `EntitlementGuard` — `@RequireEntitlement('geofencing')` when the feature is plan-gated.
 

@@ -56,5 +56,20 @@ export async function switchOrganization(id: string, queryClient: QueryClient): 
 export const activeMembership = (me: MeDto | null) =>
   me?.memberships.find((m) => m.relation === 'MEMBER' && m.organization.id === me.activeOrganizationId) ?? null;
 
-export const homePathFor = (me: MeDto | null) =>
-  activeMembership(me)?.organization.type === 'PLATFORM' ? '/admin' : me?.activeOrganizationId ? '/app' : '/onboarding';
+/** The active organization, whether the user is a member of it or (provider staff) acts for it. */
+export const activeOrganization = (me: MeDto | null) =>
+  me?.memberships.find((m) => m.organization.id === me.activeOrganizationId)?.organization ?? null;
+
+/** Where each kind of organization lives: platform admin, provider console, or the end-customer app. */
+export const homePathFor = (me: MeDto | null) => {
+  switch (activeOrganization(me)?.type) {
+    case 'PLATFORM':
+      return '/admin';
+    case 'PROVIDER':
+      return '/provider';
+    case 'CUSTOMER':
+      return '/app';
+    default:
+      return '/onboarding';
+  }
+};

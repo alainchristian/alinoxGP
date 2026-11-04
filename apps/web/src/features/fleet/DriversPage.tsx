@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Plus, Search } from 'lucide-react';
 import { P, type DriverDto } from '@gps/shared';
 import { Dialog } from '@/components/ui/dialog';
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Skeleton, Table, Td, Th } from '@/components/ui/primitives';
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, KpiCard, PageHeader, Select, Skeleton, Table, Td, Th } from '@/components/ui/primitives';
 import { ApiError, api, apiPaged } from '@/lib/api';
 import { hasPermission, useAuthStore } from '@/lib/auth-store';
 import { applyApiError } from '@/lib/forms';
@@ -56,32 +56,54 @@ function DriversView({ orgId }: { orgId: string }) {
     onError: (e) => { setDeleting(null); setActionError(e instanceof ApiError ? errorMessage(e.code) : errorMessage(undefined)); },
   });
 
+  const rows = drivers.data?.data ?? [];
+  const totalCount = drivers.data?.meta.total ?? 0;
+  const activeCount = rows.filter((d) => d.status === 'ACTIVE').length;
+  const assignedCount = rows.filter((d) => d.vehicle !== null).length;
+  const unassignedCount = rows.filter((d) => d.vehicle === null).length;
+
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
         title="Drivers"
         description="The people who drive your vehicles. A driver is assigned to a vehicle from the vehicle's page; the platform does not claim the assigned person is driving at any given moment."
         actions={canManage ? <Button onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden /> Add driver</Button> : undefined}
       />
-      {actionError && <div className="mb-4"><Alert>{actionError}</Alert></div>}
-      <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-          <div className="relative min-w-52 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-faint" aria-hidden />
-            <Input aria-label="Search drivers" placeholder="Search name, phone or licence number" className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+      {actionError && <div><Alert>{actionError}</Alert></div>}
+
+      {drivers.data && totalCount > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard tone="brand" label="Total drivers" value={totalCount} />
+          <KpiCard tone="ok" label="Active" value={activeCount} caption="On current page" />
+          <KpiCard tone="brand" label="Assigned to vehicle" value={assignedCount} caption="On current page" />
+          <KpiCard tone="warn" label="Unassigned" value={unassignedCount} caption="On current page" />
+        </div>
+      )}
+
+      <Card className="overflow-hidden">
+        <div className="space-y-3 border-b border-border/80 px-6 pt-5 pb-4">
+          <div>
+            <h2 className="text-[16px] font-bold tracking-tight text-text">Driver directory</h2>
+            <p className="text-xs text-text-muted">Manage driver records, licences and vehicle assignments</p>
           </div>
-          <Select aria-label="Status" className="w-36" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-            <option value="">Any status</option>
-            {driverStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-          <Select aria-label="Assignment" className="w-44" value={assigned} onChange={(e) => { setAssigned(e.target.value); setPage(1); }}>
-            <option value="">Assigned or not</option>
-            <option value="true">Assigned to a vehicle</option>
-            <option value="false">Not assigned</option>
-          </Select>
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <div className="relative min-w-56 flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-text-faint" aria-hidden />
+              <Input aria-label="Search drivers" placeholder="Search name, phone or licence number" className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            </div>
+            <Select aria-label="Status" className="w-36 bg-surface" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+              <option value="">Any status</option>
+              {driverStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+            <Select aria-label="Assignment" className="w-44 bg-surface" value={assigned} onChange={(e) => { setAssigned(e.target.value); setPage(1); }}>
+              <option value="">Assigned or not</option>
+              <option value="true">Assigned to a vehicle</option>
+              <option value="false">Not assigned</option>
+            </Select>
+          </div>
         </div>
         {drivers.isPending ? (
-          <div className="space-y-2 p-5"><Skeleton className="h-8" /><Skeleton className="h-8" /><Skeleton className="h-8" /></div>
+          <div className="space-y-2.5 p-6"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
         ) : drivers.isError ? (
           <QueryError query={drivers} what="drivers" />
         ) : drivers.data.data.length === 0 ? (
@@ -100,13 +122,13 @@ function DriversView({ orgId }: { orgId: string }) {
               <thead><tr><Th>Name</Th><Th>Phone</Th><Th>Licence</Th><Th>Licence validity</Th><Th>Status</Th><Th>Assigned vehicle</Th>{canManage && <Th className="text-right">Actions</Th>}</tr></thead>
               <tbody>
                 {drivers.data.data.map((d) => (
-                  <tr key={d.id} className="hover:bg-surface-2">
-                    <Td className="font-medium">{d.fullName}{d.email && <div className="text-xs font-normal text-text-muted">{d.email}</div>}</Td>
-                    <Td className="tabular">{d.phone ?? '—'}</Td>
+                  <tr key={d.id} className="hover:bg-surface-2/70 transition-colors">
+                    <Td className="font-bold text-text">{d.fullName}{d.email && <div className="text-xs font-normal text-text-muted">{d.email}</div>}</Td>
+                    <Td className="tabular text-text-muted">{d.phone ?? '—'}</Td>
                     <Td>{d.licenseNumber ? <>{d.licenseNumber}{d.licenseClass && <span className="text-text-muted"> · class {d.licenseClass}</span>}</> : '—'}</Td>
                     <Td><ExpiryBadge expiry={d.license} /></Td>
                     <Td><Badge tone={d.status === 'ACTIVE' ? 'ok' : 'neutral'}>{d.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Badge></Td>
-                    <Td>{d.vehicle ? <Link className="text-brand hover:underline" to={`/app/vehicles/${d.vehicle.id}`}>{d.vehicle.registrationNumber}</Link> : <span className="text-text-muted">None</span>}</Td>
+                    <Td>{d.vehicle ? <Link className="font-bold text-text hover:text-brand hover:underline" to={`/app/vehicles/${d.vehicle.id}`}>{d.vehicle.registrationNumber}</Link> : <span className="text-text-muted">None</span>}</Td>
                     {canManage && (
                       <Td className="text-right">
                         <span className="inline-flex gap-1">
@@ -132,7 +154,7 @@ function DriversView({ orgId }: { orgId: string }) {
           <Button variant="danger" loading={remove.isPending} onClick={() => deleting && remove.mutate(deleting.id)}>Delete driver</Button>
         </div>
       </Dialog>
-    </>
+    </div>
   );
 }
 
@@ -192,7 +214,7 @@ function DriverFormDialog({ driver, open, onOpenChange, onSaved }: { driver?: Dr
           </Field>
         </div>
         <Field label="Notes" htmlFor="d-notes" error={errors.notes?.message}>
-          <textarea id="d-notes" rows={3} className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text" {...register('notes')} />
+          <textarea id="d-notes" rows={3} className="w-full rounded-[10px] border border-border bg-surface-2/80 px-3.5 py-2 text-sm text-text" {...register('notes')} />
         </Field>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>

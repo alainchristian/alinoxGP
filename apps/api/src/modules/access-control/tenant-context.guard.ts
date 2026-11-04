@@ -3,17 +3,20 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ClsService } from 'nestjs-cls';
 import { IS_AUTHENTICATED, IS_PUBLIC, NO_TENANT } from '../../common/decorators';
+import { API_PREFIX } from '../../app.setup';
 import { AppException, notFound, unauthorized } from '../../common/errors';
 import { isUuid } from '../../common/mappers';
 import type { AppClsStore } from '../../common/request-context';
 import { AccessService } from './access.service';
+import { ProviderAccessLogService } from './provider-access-log.service';
 
 /**
- * Resolves the active organization for the request (ADR-0003). The client may only *request* one:
+ * Resolves the active organization for the request (ADR-0003, ADR-0010). The client may only *request* one:
  *  - `/organizations/:organizationId/...` routes use the path parameter;
  *  - other routes use the `X-Organization-Id` header, or the user's oldest active membership.
- * The request is accepted only if the authenticated user is an active member of it (or the reseller
- * parent of a child customer). Anything else is a 404 — a 403 would confirm the organization exists.
+ * The request is accepted only if the authenticated user is an active member of it, or is staff of the PROVIDER of that
+ * customer organization (and within their customer scope). Anything else is a 404 — a 403 would confirm it exists.
+ * Provider staff acting for a customer are written to the audit log (visible to the customer's owner).
  */
 @Injectable()
 export class TenantContextGuard implements CanActivate {
@@ -21,6 +24,7 @@ export class TenantContextGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly access: AccessService,
     private readonly cls: ClsService<AppClsStore>,
+    private readonly accessLog: ProviderAccessLogService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -52,15 +56,31 @@ export class TenantContextGuard implements CanActivate {
       throw new AppException('ORGANIZATION_SUSPENDED', 403, 'This organization is suspended');
     }
 
+    if (resolved.providerSuspended) {
+      throw new AppException('SERVICE_TEMPORARILY_UNAVAILABLE', 403, 'This service is temporarily unavailable. Please contact your provider.');
+    }
+
     this.cls.set('tenant', {
       organizationId: resolved.organization.id,
       organizationType: resolved.organization.type,
+      providerId: resolved.organization.providerId,
       userId: auth.userId,
       memberId: resolved.memberId,
       actorOrganizationId: resolved.actorOrganizationId,
       actingAs: resolved.actingAs,
+      customerScope: resolved.customerScope,
       permissions: resolved.permissions,
     });
+
+    if (resolved.actingAs === 'PROVIDER_STAFF') {
+      await this.accessLog.logCustomer(auth.userId, resolved.actorOrganizationId, resolved.organization.id, this.areaOf(req), req.method);
+    }
     return true;
+  }
+
+  /** Area = the resource family: /api/v1/vehicles/... and /api/v1/organizations/:id/members/... both name it. */
+  private areaOf(req: Request): string {
+    const segments = req.path.replace(`/${API_PREFIX}`, '').split('/').filter(Boolean);
+    return (segments[0] === 'organizations' ? segments[2] : segments[0]) ?? 'organization';
   }
 }

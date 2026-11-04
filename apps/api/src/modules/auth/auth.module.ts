@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ENV, type Env } from '../../infrastructure/config/env';
 import { AccessControlModule } from '../access-control/access-control.module';
-import { OrganizationsModule } from '../organizations/organizations.module';
+import { ProvidersModule } from '../providers/providers.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -21,7 +21,7 @@ import { TotpService } from './totp.service';
     }),
     UsersModule,
     AccessControlModule,
-    OrganizationsModule,
+    ProvidersModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, SessionService, TotpService, JwtAuthGuard, StepUpGuard],

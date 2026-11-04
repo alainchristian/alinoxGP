@@ -13,12 +13,19 @@ export const STATUS_ICON: Record<VehicleStatus, LucideIcon> = {
   NO_DATA: CircleDashed,
 };
 
+/** Soft pill badge matching 03_vehicles.png ("Moving", "Parked", "Offline", "Idle") while keeping distinct icons for accessibility. */
 export function StatusBadge({ status }: { status: VehicleStatus }) {
   const meta = STATUS_META[status];
   const Icon = STATUS_ICON[status];
   return (
-    <span title={meta.hint} className={cn('inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs font-medium', meta.className)}>
-      <Icon className="size-3.5" aria-hidden />
+    <span
+      title={meta.hint}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-semibold tracking-tight',
+        meta.className,
+      )}
+    >
+      <Icon className="size-3 shrink-0" aria-hidden />
       {meta.label}
     </span>
   );

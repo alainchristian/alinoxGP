@@ -61,7 +61,7 @@ function DeviceDetailView({ orgId, deviceId }: { orgId: string; deviceId: string
   const d = device.data;
 
   return (
-    <>
+    <div className="space-y-5">
       <Back />
       <PageHeader
         title={d.name ?? d.uniqueId}
@@ -69,10 +69,10 @@ function DeviceDetailView({ orgId, deviceId }: { orgId: string; deviceId: string
         actions={<div className="flex items-center gap-2">{isSimulatedDevice(d.uniqueId) && <SimulatedBadge />}<Badge tone={displayStatusTone(d)}>{d.displayStatus}</Badge></div>}
       />
       <OnboardingCard device={d} canRegister={canRegister} onChanged={refresh} />
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Details" />
-          <dl className="px-5 py-3 text-[13px]">
+          <dl className="px-6 py-3 text-[13px]">
             <DetailRow label="Identifier"><span className="tabular">{d.uniqueId}</span></DetailRow>
             <DetailRow label="Model">{d.variant ? d.variant.label : 'Not identified'}</DetailRow>
             <DetailRow label="Firmware">{d.firmwareVersion ?? '—'}</DetailRow>
@@ -88,12 +88,12 @@ function DeviceDetailView({ orgId, deviceId }: { orgId: string; deviceId: string
       </div>
       {canCaps && <CapabilitiesCard deviceId={deviceId} orgId={orgId} refreshKey={d.lifecycleStatus + (d.lastSeenAt ?? '')} />}
       <HistoryCard deviceId={deviceId} orgId={orgId} timezone={timezone} refreshKey={d.lifecycleStatus} />
-    </>
+    </div>
   );
 }
 
 const Back = () => (
-  <Link to="/app/devices" className="mb-3 inline-flex items-center gap-1 text-[13px] text-text-muted hover:text-text"><ArrowLeft className="size-4" aria-hidden /> Devices</Link>
+  <Link to="/app/devices" className="mb-1 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted transition-colors hover:text-slate-900"><ArrowLeft className="size-4" aria-hidden /> Devices</Link>
 );
 
 // ---------------------------------------------------------------- onboarding

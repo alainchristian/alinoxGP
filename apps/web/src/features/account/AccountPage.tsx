@@ -20,10 +20,10 @@ export function AccountPage() {
       <div className="space-y-6">
         <Card className="max-w-xl">
           <CardHeader title="Profile" />
-          <dl className="space-y-3 px-5 py-4 text-[13px]">
-            <div className="flex justify-between"><dt className="text-text-muted">Name</dt><dd className="font-medium">{me.user.fullName}</dd></div>
-            <div className="flex justify-between"><dt className="text-text-muted">Email</dt><dd className="font-medium">{me.user.email}</dd></div>
-            <div className="flex justify-between"><dt className="text-text-muted">Email verified</dt><dd>{me.user.emailVerified ? <Badge tone="ok">Verified</Badge> : <Badge tone="warn">Not verified</Badge>}</dd></div>
+          <dl className="divide-y divide-border/50 px-6 pb-4 text-[13px]">
+            <div className="flex justify-between py-2.5"><dt className="text-text-muted">Name</dt><dd className="font-semibold text-text">{me.user.fullName}</dd></div>
+            <div className="flex justify-between py-2.5"><dt className="text-text-muted">Email</dt><dd className="font-semibold text-text">{me.user.email}</dd></div>
+            <div className="flex justify-between py-2.5"><dt className="text-text-muted">Email verified</dt><dd>{me.user.emailVerified ? <Badge tone="ok">Verified</Badge> : <Badge tone="warn">Not verified</Badge>}</dd></div>
           </dl>
         </Card>
         <ChangePassword />

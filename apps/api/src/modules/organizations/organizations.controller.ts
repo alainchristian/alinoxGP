@@ -21,7 +21,6 @@ import { OrganizationsService } from './organizations.service';
 import {
   AcceptInvitationExistingDto,
   AcceptInvitationNewUserDto,
-  CreateOrganizationDto,
   InviteMemberDto,
   LookupInvitationDto,
   PageQueryDto,
@@ -39,17 +38,11 @@ export class OrganizationsController {
     private readonly cls: ClsService<AppClsStore>,
   ) {}
 
-  /** Organizations I belong to (and, for resellers, their child customers). */
+  /** Organizations I belong to (and, for provider staff, their provider's customers within their scope). */
   @Get()
   @NoTenant()
   list() {
     return this.orgs.listForUser(this.cls.get('auth')!.userId);
-  }
-
-  @Post()
-  @NoTenant()
-  create(@Body() body: CreateOrganizationDto) {
-    return this.orgs.createForUser(this.cls.get('auth')!.userId, body);
   }
 
   @Get(':organizationId')

@@ -22,18 +22,18 @@ export function Dialog({
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-40 bg-slate-900/40" />
+        <RadixDialog.Overlay className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-xs transition-opacity" />
         <RadixDialog.Content
-          className={`fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-surface p-5 shadow-lg ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'}`}
+          className={`fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border/80 bg-surface p-6 shadow-xl ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'}`}
         >
-          <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="mb-5 flex items-start justify-between gap-3 border-b border-border/60 pb-3.5">
             <div>
-              <RadixDialog.Title className="text-base font-semibold">{title}</RadixDialog.Title>
+              <RadixDialog.Title className="text-base font-bold tracking-tight text-slate-900">{title}</RadixDialog.Title>
               <RadixDialog.Description className={description ? 'mt-1 text-[13px] text-text-muted' : 'sr-only'}>
                 {description ?? title}
               </RadixDialog.Description>
             </div>
-            <RadixDialog.Close aria-label="Close" className="rounded-md p-1 text-text-muted hover:bg-surface-2">
+            <RadixDialog.Close aria-label="Close" className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface-2 hover:text-slate-900">
               <X className="size-4" aria-hidden />
             </RadixDialog.Close>
           </div>

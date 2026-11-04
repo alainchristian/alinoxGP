@@ -2,9 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { TenantPrismaService } from '../src/infrastructure/prisma/prisma.service';
 import {
   addMember,
-  addMemberAndLogin,
   bearer,
-  createOrg,
   createTestApp,
   http,
   PASSWORD,
@@ -18,7 +16,7 @@ import {
 
 /**
  * Mandatory tenant-isolation suite (skill gps-tenant-isolation §7).
- * Fixture: Org A and Org B (self-registered owners), Reseller R1 -> child C1, Reseller R2 -> child C2.
+ * Fixture: Org A and Org B (self-registered owners), (the provider hierarchy P1/C1/C2/P2/C3 is covered by providers.e2e-spec.ts).
  */
 describe('Tenant isolation (e2e)', () => {
   let ctx: TestCtx;
@@ -27,8 +25,6 @@ describe('Tenant isolation (e2e)', () => {
   let ownerB: TestUser & { organizationId?: string };
   let A: string;
   let B: string;
-  let R1: string, C1: string, R2: string, C2: string;
-  let r1Admin: TestUser, r2Admin: TestUser, c1Owner: TestUser, c2Owner: TestUser;
   let memberOfA: { memberId: string; email: string };
   let invitationOfA: string;
 
@@ -40,15 +36,6 @@ describe('Tenant isolation (e2e)', () => {
     ownerB = await registerUser(ctx, { organizationName: 'Org B' });
     A = ownerA.organizationId!;
     B = ownerB.organizationId!;
-
-    R1 = (await createOrg(ctx, { name: 'Reseller 1', type: 'RESELLER' })).id;
-    R2 = (await createOrg(ctx, { name: 'Reseller 2', type: 'RESELLER' })).id;
-    C1 = (await createOrg(ctx, { name: 'Customer 1', parentOrganizationId: R1 })).id;
-    C2 = (await createOrg(ctx, { name: 'Customer 2', parentOrganizationId: R2 })).id;
-    r1Admin = await addMemberAndLogin(ctx, R1, 'RESELLER_ADMIN');
-    r2Admin = await addMemberAndLogin(ctx, R2, 'RESELLER_ADMIN');
-    c1Owner = await addMemberAndLogin(ctx, C1, 'ORG_OWNER');
-    c2Owner = await addMemberAndLogin(ctx, C2, 'ORG_OWNER');
 
     const viewer = await addMember(ctx, A, 'VIEWER');
     memberOfA = { memberId: viewer.member.id, email: viewer.email };
@@ -134,10 +121,9 @@ describe('Tenant isolation (e2e)', () => {
       const stored = await ctx.system.invitation.findUniqueOrThrow({ where: { id: res.body.data.id } });
       expect(stored.organizationId).toBe(B);
 
+      // No route lets a customer user create organizations at all (end customers are created by their provider).
       const created = await http(ctx).post(url('/organizations')).set(asB()).send({ name: 'Mine', organizationId: A, parentOrganizationId: A, type: 'PLATFORM' });
-      expect(created.status).toBe(201);
-      expect(created.body.data.type).toBe('CUSTOMER');
-      expect(created.body.data.parentOrganizationId).toBeNull();
+      expect(created.status).toBe(404);
     });
 
     it('unauthenticated requests never reach tenant data', async () => {
@@ -221,42 +207,6 @@ describe('Tenant isolation (e2e)', () => {
                EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'organization_members' AND tableowner = current_user) AS owner
         FROM pg_roles r WHERE r.rolname = current_user`;
       expect(r[0]).toEqual({ super: false, bypass: false, owner: false });
-    });
-  });
-
-  describe('Reseller hierarchy', () => {
-    it('R1 sees its child C1 (and not C2); C1 and R2 cannot see R1', async () => {
-      const mine = await http(ctx).get(url('/organizations')).set(bearer(r1Admin));
-      const byRelation = mine.body.data.map((m: { organization: { id: string }; relation: string }) => [m.organization.id, m.relation]);
-      expect(byRelation).toEqual(expect.arrayContaining([[R1, 'MEMBER'], [C1, 'CHILD']]));
-      expect(byRelation.map((x: string[]) => x[0])).not.toContain(C2);
-
-      expect((await http(ctx).get(url(`/organizations/${C1}`)).set(bearer(r1Admin))).status).toBe(200);
-      expect((await http(ctx).get(url(`/organizations/${C2}`)).set(bearer(r1Admin))).status).toBe(404);
-      expect((await http(ctx).get(url(`/organizations/${C1}/members`)).set(bearer(r2Admin))).status).toBe(404);
-      expect((await http(ctx).get(url(`/organizations/${R1}`)).set(bearer(c1Owner))).status).toBe(404);
-      expect((await http(ctx).get(url(`/organizations/${C2}`)).set(bearer(c1Owner))).status).toBe(404);
-      expect((await http(ctx).get(url(`/organizations/${R1}`)).set(bearer(r2Admin))).status).toBe(404);
-      expect((await http(ctx).get(url(`/organizations/${C2}`)).set(bearer(c2Owner))).status).toBe(200);
-    });
-
-    it('a reseller acting for a child customer is read-only', async () => {
-      const read = await http(ctx).get(url(`/organizations/${C1}/members`)).set(bearer(r1Admin));
-      expect(read.status).toBe(200);
-      expect(read.body.data.map((m: { email: string }) => m.email)).toEqual([c1Owner.email]);
-
-      await stepUp(ctx, r1Admin);
-      const patch = await http(ctx).patch(url(`/organizations/${C1}`)).set(bearer(r1Admin)).send({ name: 'Taken over' });
-      expect(patch.status).toBe(403);
-      const invite = await http(ctx).post(url(`/organizations/${C1}/invitations`)).set(bearer(r1Admin)).send({ email: uniqueEmail(), roleKey: 'VIEWER' });
-      expect(invite.status).toBe(403);
-      expect((await ctx.system.organization.findUniqueOrThrow({ where: { id: C1 } })).name).toBe('Customer 1');
-    });
-
-    it('the database rejects invalid hierarchies (only RESELLER -> CUSTOMER, one level)', async () => {
-      await expect(createOrg(ctx, { type: 'CUSTOMER', parentOrganizationId: A })).rejects.toThrow(/hierarchy/i);
-      await expect(createOrg(ctx, { type: 'RESELLER', parentOrganizationId: R1 })).rejects.toThrow(/hierarchy/i);
-      await expect(createOrg(ctx, { type: 'CUSTOMER', parentOrganizationId: C1 })).rejects.toThrow(/hierarchy/i);
     });
   });
 

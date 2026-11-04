@@ -56,9 +56,9 @@ export function LoginPage() {
       title="Sign in"
       footer={
         <>
-          New here?{' '}
+          Run a tracking business?{' '}
           <Link to="/register" className="text-brand underline">
-            Create an account
+            Register as a provider
           </Link>
         </>
       }

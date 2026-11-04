@@ -4,9 +4,10 @@
 | | |
 |---|---|
 | **Document** | `docs/PROJECT_SPEC.md` — single source of truth for requirements |
-| **Version** | 1.0 (consolidated) — 1 November 2026 |
+| **Version** | 1.2 — 4 November 2026 (speed governors, M3 split, prototype maps; see Appendix A.5). 1.1 — 1 November 2026 (provider-first revision) |
 | **Owner** | Alain Christian Majyambere |
-| **Sources merged** | (1) *Base brief* — "International GPS Tracking, Fleet Management and Vehicle Security SaaS Platform"; (2) *Extension brief* — "Extend the existing project requirements…" (declared mandatory) |
+| **Sources merged** | (1) *Base brief* — "International GPS Tracking, Fleet Management and Vehicle Security SaaS Platform"; (2) *Extension brief* — "Extend the existing project requirements…" (declared mandatory); (3) *Owner decisions of 1 Nov 2026* — the platform serves **GPS tracking providers** (see Appendix A.4), which take precedence over both briefs where they conflict |
+| **Product in one sentence** | A multi-tenant tracking platform that **GPS tracking providers** subscribe to, so they can serve and track the vehicles of **their own customers** under their own brand |
 | **Initial market** | Rwanda (RWF, Africa/Kigali), architected for international expansion |
 
 ---
@@ -19,6 +20,19 @@
 4. **Uncertain facts** (hardware capabilities, protocols, provider pricing, regulation) are collected in **Appendix B — Open questions requiring verification**. Per the extension brief, these must be verified, not assumed.
 5. **"Must", "never" and "do not"** are binding. "Should" and "consider" leave room for architectural judgment, which must be documented (see Rule 9).
 6. Implementation guidance for Claude Code lives in the project skills under `.claude/skills/` — see **Appendix C**.
+7. **Owner decisions (1 Nov 2026) override both briefs.** The platform is sold to GPS tracking providers, not directly to vehicle owners. Text from the briefs that assumed direct sales has been rewritten; Appendix A.4 lists every change. Where the briefs say "customer", read "provider's customer" (an end-customer organization) unless the context is billing, where the paying customer is the provider.
+
+### Glossary
+
+| Term | Meaning |
+|---|---|
+| **Platform** | Us — the operator of this software (Alain's company) |
+| **Provider** | A GPS tracking business (installer, tracking company, dealer) that registers on the platform and pays us per device. Formerly called "reseller" in the briefs |
+| **End customer** | An individual or organization (car owner, fleet, NGO…) served by a provider; it logs in to see only its own vehicles |
+| **Device** | A GPS tracker owned or managed by a provider and assigned to an end customer's vehicle |
+| **Speed governor** | A device fitted to public/goods transport vehicles that limits maximum speed on the vehicle and records and transmits speed data (also called speed limiter) |
+| **Governed vehicle** | A vehicle enrolled in speed-governor compliance (Module 18) |
+| **Regulator** | A read-only external organization (e.g. RURA) given access to governed-vehicle compliance data |
 
 ---
 
@@ -29,7 +43,7 @@ Act as a senior software architect, GPS tracking systems engineer, IoT integrati
 You are responsible for designing and building a professional, commercial-grade GPS tracking and fleet management platform.
 
 - Do not approach this as a simple CRUD application.
-- Treat it as a serious commercial SaaS platform serving individual vehicle owners, transport companies, logistics businesses, organizations managing fleets, GPS installation businesses, and other GPS tracking service providers.
+- Treat it as a serious commercial B2B2C SaaS platform: **GPS tracking providers** are our paying customers, and through them the platform serves individual vehicle owners, transport companies, logistics businesses and other organizations managing fleets.
 - Think like a company building a commercial product that must compete with established international platforms — not a developer building a demonstration project.
 - The platform launches in Rwanda and will expand into other African countries and international markets.
 - Your work must demonstrate professional software engineering, thoughtful architecture, excellent user experience, security, scalability and commercial awareness.
@@ -40,46 +54,74 @@ You are responsible for designing and building a professional, commercial-grade 
 
 ## 2. Product vision
 
-We are building a **GPS Tracking, Fleet Management and Vehicle Security SaaS platform**.
+We are building a **GPS Tracking, Fleet Management and Vehicle Security SaaS platform for GPS tracking providers**.
 
-### 2.1 What customers can do
+GPS tracking providers register on the platform, connect the trackers they install, create accounts for their own customers, and track and serve those customers' vehicles. The platform never sells to vehicle owners directly and never competes with its providers for their customers.
 
-1. Purchase GPS tracking devices from us.
-2. Request professional installation of GPS devices.
-3. Register their vehicles.
-4. Connect existing GPS tracking devices from supported manufacturers.
-5. Monitor vehicles in real time.
-6. View historical vehicle movements.
-7. Replay vehicle journeys.
-8. Monitor vehicle speed and ignition status.
-9. Receive vehicle security alerts.
-10. Create geographical boundaries (geofences).
-11. Remotely immobilize compatible vehicles through an authorized and safety-controlled process (stationary starter-inhibit only — see Module 12).
-12. Monitor drivers.
-13. Generate fleet management reports.
-14. Manage multiple vehicles under one account.
-15. Manage subscriptions and payments.
-16. See which capabilities their installed GPS devices actually support (from the extension brief).
+```
+Platform (us) ──bills per active device──► Provider A ──serves & bills (outside the platform)──► End customers of A
+                                          Provider B ──────────────────────────────────────────► End customers of B
+```
 
-### 2.2 Business models (both must coexist in the same platform)
+### 2.1 What providers can do
 
-**Model A — Direct GPS tracking service.** We purchase GPS tracking devices, sell them to customers, arrange installation and charge recurring tracking subscription fees.
+1. Register their company on the platform and, after approval, start a trial or subscription.
+2. Brand the platform with their logo and colours, so their customers see the provider's brand.
+3. Add their staff (administrators, operations/support, technicians, finance) with granular permissions.
+4. Register GPS devices individually or in bulk (e.g. CSV import of IMEIs) from supported manufacturers, and check compatibility in the device catalogue.
+5. Connect devices to the platform's GPS servers (configuration instructions per model) and verify the first signal.
+6. Create and manage their end customers (individuals or organizations) and invite those customers' users.
+7. Register vehicles for their customers, assign devices and drivers, and manage device replacement.
+8. Manage their device stock, installations, technicians and installation verification.
+9. Monitor all their customers' vehicles and device health in one console, and act as first-line support.
+10. Enable vehicle security (stationary starter-inhibit) only for professionally installed and verified vehicles, and handle emergency restoration for their customers.
+11. Suspend or reactivate service for an individual end customer (e.g. when the customer has not paid the provider).
+12. View their usage (active devices) and pay the platform's invoices (MTN Mobile Money, Flutterwave, bank transfer).
+13. If they are authorised speed-governor suppliers: record governor installations and inspections, receive violation and tamper alarms, send the required SMS alerts, produce RURA's quarterly reports, and give RURA read-only access (Module 18).
 
-**Model B — GPS tracking software service.** Customers and existing GPS tracking businesses connect their compatible GPS devices to our platform and manage them through our software ("bring your own device").
+### 2.2 What end customers can do
 
-The platform must support resellers and, in a future phase, white-label customers.
+1. Log in under their provider's brand and see only their own organization's vehicles.
+2. Monitor vehicles in real time; view historical movements and replay journeys.
+3. Monitor vehicle speed and ignition status.
+4. Receive vehicle security alerts and notifications.
+5. Create geographical boundaries (geofences) and alert rules.
+6. Request immobilization/restoration of compatible, verified vehicles through the safety-controlled process (stationary starter-inhibit only — see Module 12).
+7. Manage drivers (where the provider's plan allows).
+8. Generate fleet management reports.
+9. Manage multiple vehicles and their own users under one account.
+10. See which capabilities their installed GPS devices actually support.
+11. Contact their provider for support (the provider's contact details are shown in the app).
 
-### 2.3 Supported business arrangements
+End customers do **not** buy devices, subscriptions or installations through the platform; they deal with their provider for those.
 
-- Individual vehicle owners and private car owners.
-- Small businesses.
-- Transport and logistics companies, delivery businesses.
+### 2.3 Business model
+
+**Single model — tracking platform for GPS providers.** Providers pay the platform a recurring fee per **active device** (see Module 15). Each provider sets its own prices and bills its own customers outside the platform.
+
+- *Model A of the base brief (we sell devices and installation directly) is out of scope* — owner decision, Appendix A.4.
+- *Model B (bring your own device)* is now the core model, operated by providers on behalf of their customers.
+- Providers are white-labelled with logo and colours in the first release. Provider-owned domains, branded email sender and branded mobile apps are a later phase (design for them now).
+- Billing tools for providers to invoice their own customers are **not** in scope for the first release (possible later add-on).
+
+### 2.4 Who the providers are and who they serve
+
+Providers (our customers):
+
+- GPS installation businesses and independent installers.
+- GPS tracking companies currently using another platform (e.g. a manufacturer's free app or a white-label platform).
+- **RURA-authorised speed-governor suppliers**, which must provide a compliant tracking platform for the governors they install (Module 18).
+- Vehicle security and telematics companies adding tracking.
+- Car dealers, rental companies or fleet service firms that track vehicles for others.
+- In a later phase: providers in other countries, and sub-agents of providers.
+
+Their end customers:
+
+- Individual vehicle and motorcycle owners.
+- Small businesses; transport, logistics and delivery companies.
 - Taxi and car rental businesses, bus operators.
 - Large fleet operators, construction companies, organizations managing fleets.
 - NGOs, government institutions and other institutions.
-- GPS installation businesses.
-- GPS tracking resellers and other GPS tracking service providers.
-- White-label service providers (future phase).
 
 ---
 
@@ -121,7 +163,7 @@ Use this stack unless there is a compelling technical reason to propose a change
 
 | Area | Choice |
 |---|---|
-| **Frontend** | React, TypeScript, Vite, Tailwind CSS, a professional component system such as shadcn/ui, React Router, TanStack Query, Zustand where appropriate, React Hook Form, Zod validation, Mapbox GL JS (maps), Recharts (analytics) |
+| **Frontend** | React, TypeScript, Vite, Tailwind CSS, a professional component system such as shadcn/ui, React Router, TanStack Query, Zustand where appropriate, React Hook Form, Zod validation, maps: **MapLibre GL JS + OpenFreeMap for development and prototype**, **Mapbox GL JS (or another commercial vendor) for production**, chosen in M11, with all map setup in one module; Recharts (analytics) |
 | **Backend** | Node.js, TypeScript, NestJS, REST API, WebSockets, JWT or secure session-based authentication, role-based access control, Swagger/OpenAPI |
 | **Database** | PostgreSQL, Prisma ORM, proper indexing, database migrations |
 | **GPS engine** | Traccar |
@@ -154,14 +196,18 @@ Architecture style:
   - https://www.traccar.org/traccar-api/
   - https://www.traccar.org/api-reference/
 
-**Layer 3 — Our application backend (NestJS).** Manages all commercial and application logic: customers, organizations, users, roles, permissions, vehicles, GPS device assignments, device catalogue and onboarding, installations, drivers, subscriptions, payments, notifications, reporting, vehicle security, audit logs, and API integrations.
+**Layer 3 — Our application backend (NestJS).** Manages all commercial and application logic: providers, provider branding, end-customer organizations, users, roles, permissions, vehicles, GPS device assignments, device catalogue and onboarding, installations, drivers, provider subscriptions and payments, notifications, reporting, vehicle security, audit logs, and API integrations.
 
 - Traccar must remain an independent GPS processing component.
 - **Never expose Traccar administrator credentials to the frontend.**
 - The frontend communicates only with our NestJS API.
 - NestJS must enforce tenant permissions **before** returning GPS data or executing commands.
 
-**Layer 4 — Frontend application (React).** Provides the customer-facing platform and, separately, the platform-administration interface: live tracking dashboard, interactive maps, vehicle management, device management, trip history, vehicle security, geofencing, reports, notifications, account management, subscription management.
+**Layer 4 — Frontend application (React).** One React application with three separate interfaces (see §12):
+
+1. **Customer app** — for end customers, shown under their provider's brand: live tracking, maps, vehicles, trips, geofences, alerts, vehicle security, reports, users.
+2. **Provider console** — for provider staff: all their customers, devices, onboarding, installations, support tools, branding, provider billing.
+3. **Platform admin** — for our staff: providers, device catalogue, platform billing, diagnostics, audit, settings.
 
 ### 5.2 External service provider abstraction
 
@@ -181,7 +227,7 @@ It must be possible to replace or add providers without rewriting the business a
 | Concern | Initial provider |
 |---|---|
 | GPS engine | Traccar |
-| Maps | Mapbox |
+| Maps | MapLibre + OpenFreeMap (prototype); Mapbox or alternative (production, decided in M11) |
 | Database | PostgreSQL |
 | ORM | Prisma |
 | Backend | NestJS |
@@ -195,13 +241,25 @@ Keep payment and notification integrations modular so they can be introduced pro
 
 ## 6. Multi-tenant architecture (critical)
 
-Build the platform as a multi-tenant SaaS application. Multiple independent organizations use the same application.
+Build the platform as a multi-tenant SaaS application with a **three-level tenant hierarchy**, enforced from the first milestone:
 
-*Example:* Organization A — ABC Transport Ltd, 35 vehicles. Organization B — XYZ Logistics, 20 vehicles. Organization C — John, 2 vehicles. Organization D — Rwanda Tours, 12 vehicles.
+```
+Platform (us)
+├── Provider: SecureTrack Ltd            ← pays us; sees all of its own customers
+│   ├── End customer: ABC Transport Ltd (35 vehicles)
+│   ├── End customer: John (2 vehicles)
+│   └── End customer: Rwanda Tours (12 vehicles)
+└── Provider: Kigali GPS Services        ← cannot see SecureTrack or its customers
+    └── End customer: XYZ Logistics (20 vehicles)
+```
 
 Requirements:
 
-- Strict organization-level data isolation. A customer must **never** access another organization's vehicles, devices, positions, reports, users or billing information.
+- Strict organization-level data isolation. An end customer must **never** access another organization's vehicles, devices, positions, reports, users or billing information.
+- A provider must **never** access another provider's data, customers or devices.
+- A provider's staff may access the data of **their own** end customers, as their permissions allow, and every such access to location history or security commands is audit-logged (the end customer's data is processed on the customer's behalf; see Appendix B11).
+- An end customer must not be able to see the provider's other customers, the provider's stock, or the provider's billing with the platform.
+- Moving an end customer from one provider to another is a platform-admin operation with consent from the customer, an audit trail, and history visibility rules defined in an ADR.
 - Implement tenant isolation at **both** the database and backend levels.
 - Every tenant-owned business record must be associated with an organization/tenant identifier.
 - Use PostgreSQL constraints and appropriate authorization controls.
@@ -209,15 +267,13 @@ Requirements:
 - Never rely exclusively on frontend filtering for tenant isolation.
 - Never trust client-provided tenant identifiers.
 
-Account types to support:
+Organization types to support:
 
-- Individual accounts.
-- Business accounts.
-- Fleet organizations.
-- GPS tracking resellers.
-- White-label organizations (future phase).
-
-A reseller must be able to manage their own customers without accessing other resellers' information.
+- **Platform** (one).
+- **Provider** — GPS tracking business; white-labelled with logo and colours (own domain and apps in a later phase).
+- **End customer** — individual account (one member) or business/fleet organization, always belonging to exactly one provider.
+- *Sub-provider / agent of a provider* — later phase; design the hierarchy so a fourth level can be added without rewriting isolation.
+- **Regulator** — read-only organization outside the provider hierarchy, with access limited to governed vehicles of enrolled providers (Module 18). It is not a tenant of any provider; its access is a separate, audited grant.
 
 ---
 
@@ -228,12 +284,14 @@ Implement role-based access control with **granular** permissions, checked in th
 | Level | Roles |
 |---|---|
 | **Platform** | 1. Super Administrator · 2. Operations Administrator · 3. Technical Administrator · 4. Finance Administrator · 5. Support Administrator |
-| **Customer organization** | 1. Organization Owner · 2. Organization Administrator · 3. Fleet Manager · 4. Security Manager · 5. Driver · 6. Read-only Viewer |
-| **Reseller** | 1. Reseller Administrator · 2. Reseller Staff |
+| **Provider** (replaces "Reseller" of the base brief) | 1. Provider Owner · 2. Provider Administrator · 3. Provider Operations/Support · 4. Provider Technician · 5. Provider Finance |
+| **End-customer organization** | 1. Organization Owner · 2. Organization Administrator · 3. Fleet Manager · 4. Security Manager · 5. Driver · 6. Read-only Viewer |
+| **Regulator** (external, read-only — rev. 1.2) | 1. Regulator Administrator (manages its own users) · 2. Regulator Viewer |
 
 - Example of granularity: a Fleet Manager may view vehicle locations but may not necessarily have permission to immobilize vehicles.
 - Only authorized roles may execute sensitive vehicle commands.
-- The customer interface and the platform administration interface must have **distinct navigation and permissions**.
+- The customer app, provider console and platform admin must have **distinct navigation and permissions**.
+- Provider roles act across that provider's end customers; customer roles act only inside one end-customer organization. A provider may grant a staff member access to a subset of its customers (e.g. a support agent for one region).
 - Show menu items based on permissions (cosmetic only — the backend is the authority).
 
 ---
@@ -247,15 +305,19 @@ Implement role-based access control with **granular** permissions, checked in th
 - User registration, login, logout.
 - Password recovery, email verification.
 - User profile.
-- Organization registration.
-- Organization switching where authorized.
+- **Provider self-registration** (company details, contact, country), reviewed and approved by platform admins before devices can be connected.
+- End-customer organizations are created by their provider; end-customer users join by invitation (no public sign-up for end customers).
+- Branded login: the login page shows the provider's logo and colours when reached through the provider's login address (§12).
+- Organization switching where authorized (e.g. provider staff switching between customers; a person who belongs to several organizations).
 - Role management, permission management.
 - Session management.
 - Optional two-factor authentication.
 
 ### Module 2 — Main dashboard
 
-Show, from real data:
+Two dashboards: the **end-customer dashboard** (below) and the **provider dashboard** (all customers: active devices, devices offline or never connected, devices awaiting first signal, open alerts by customer, installations due, suspended customers, this month's billable devices).
+
+End-customer dashboard — show, from real data:
 
 - Total registered vehicles.
 - Vehicles currently moving / parked / idling / offline.
@@ -278,7 +340,7 @@ Features:
 - Display all authorized vehicles on an interactive map.
 - Display registration numbers, movement status, current speed, ignition status where supported, last GPS communication time, direction of movement, device connection status.
 - Vehicle information side panel.
-- Search vehicles; filter by status; filter by organization (where the user is authorized for more than one); group vehicles; select individual vehicles.
+- Search vehicles; filter by status; filter by organization (provider staff see all their customers' vehicles and filter by customer); group vehicles; select individual vehicles.
 - Automatic position updates.
 
 Real-time:
@@ -294,15 +356,15 @@ The interface must remain usable with **hundreds or thousands** of vehicles.
 
 ### Module 4 — Vehicle management
 
-Customers can: register vehicles, edit vehicle information, assign drivers, assign GPS devices, view vehicle history, view current location, view tracking status, view immobilizer capability, view vehicle documents, manage vehicle categories.
+Providers register vehicles for their customers and assign GPS devices. End customers (as permissions allow) can edit vehicle information, assign drivers, view vehicle history, current location, tracking status, immobilizer capability and vehicle documents, and manage vehicle categories. Whether an end customer may add vehicles itself is a provider setting (default: off, because each vehicle needs a device installed by the provider).
 
 Vehicle fields: registration number, make, model, year, color, vehicle type, VIN (where appropriate), fuel type, assigned driver, organization, GPS device, installation date, insurance expiry, inspection expiry, notes.
 
 ### Module 5 — GPS device management
 
-Administrators can:
+Provider administrators and technicians can (platform admins can do the same for support):
 
-- Register GPS devices; assign and unassign devices to/from vehicles.
+- Register GPS devices individually or by bulk import (CSV of IMEI/serial/model/SIM); assign and unassign devices to/from vehicles of their own customers.
 - Identify GPS manufacturer and model; store IMEI (and other identifiers, e.g. serial number).
 - Monitor connection status and last communication.
 - View device information, capabilities, installation information, supported commands.
@@ -312,6 +374,7 @@ Administrators can:
 Rules:
 
 - A GPS device is **not** permanently tied to a single vehicle. Support reassignment with a complete historical record.
+- Every device belongs to exactly one provider. An IMEI can be registered only once on the whole platform; if a second provider tries to register it, the platform tells that provider only that the device is unavailable (never who holds it) and alerts platform admins.
 - Device capabilities come from Module 6 and must reflect actual hardware and configuration — never assumptions based on manufacturer name.
 
 Example capability record (base brief; extended in Module 6):
@@ -353,8 +416,9 @@ Compatibility statuses:
 
 Rules:
 
-- Platform administrators manage the catalogue.
-- Customers can see which capabilities their installed devices support, e.g.:
+- Platform administrators manage the catalogue; it is shared by all providers.
+- Providers can browse the catalogue before buying hardware, request support for a new model, and submit test evidence for a model/firmware; only platform technical administrators can change a catalogue entry's verification status.
+- End customers can see which capabilities their installed devices support, e.g.:
   - Live vehicle tracking: Supported
   - Ignition monitoring: Supported
   - Fuel monitoring: Not supported
@@ -362,24 +426,28 @@ Rules:
   - Trip history: Supported
 - Capabilities must be determined from **verified technical information, configuration and actual device behaviour**, not simply the manufacturer or model name (see also Rule 12).
 
-### Module 7 — GPS device onboarding and activation *(extension brief)*
+### Module 7 — Provider onboarding, device onboarding and activation *(extension brief, adapted to providers)*
 
-Two customer categories:
+**7a. Provider onboarding**
 
-- **A.** Customers purchasing GPS devices through the platform.
-- **B.** Customers bringing their own compatible GPS devices.
+1. Provider registers (company name, registration number, country, contact person, phone, email, expected number of devices).
+2. Email and phone verification.
+3. Platform admin reviews and approves (or rejects with a reason). Until approval the provider can explore a **sandbox** with simulated devices only.
+4. Provider accepts the platform terms and the data processing agreement (Appendix B11).
+5. Provider sets up branding (logo, colours, support contact) and invites its staff.
+6. Trial starts (configurable length and device limit), then a paid plan (Module 15).
 
-Onboarding workflow:
+**7b. Device onboarding** — performed by the provider for each of its customers (the briefs' categories A "bought through the platform" and B "bring your own" collapse into one flow, because devices always come from the provider):
 
-1. Customer creates an account.
-2. Customer registers a vehicle.
-3. Customer selects or identifies the GPS device.
-4. Platform checks device compatibility.
-5. Device IMEI and other identifiers are registered.
-6. Device is configured to communicate with the platform's GPS infrastructure.
+1. Provider creates the end customer (or selects an existing one).
+2. Provider registers the vehicle for that customer.
+3. Provider selects or identifies the GPS device model (or imports a batch of devices into its stock beforehand).
+4. Platform checks device compatibility against the catalogue.
+5. Device IMEI and other identifiers are registered (globally unique).
+6. Device is configured to communicate with the platform's GPS infrastructure (per-model instructions; bulk configuration help for providers migrating many devices from another platform, e.g. SMS command templates — see Appendix B12).
 7. Platform verifies that the device is transmitting data.
 8. Vehicle is associated with the GPS device.
-9. Customer receives confirmation of successful activation.
+9. Provider and end customer receive confirmation of successful activation; the end customer's users receive their invitations if not already active.
 
 Device activation statuses:
 
@@ -394,9 +462,9 @@ Device activation statuses:
 
 Provide technical administrators with tools for **diagnosing device communication problems**.
 
-### Module 8 — Device inventory and installation management *(extension brief)*
+### Module 8 — Device inventory and installation management *(extension brief, run by providers)*
 
-For businesses that purchase hardware and installation services, maintain:
+Each provider manages its own stock, technicians and installation jobs; providers never see each other's inventory. Platform admins can view any provider's records for support. Maintain:
 
 - GPS device inventory.
 - Device serial number and IMEI.
@@ -415,7 +483,7 @@ Installation workflow statuses:
 - Installation verified.
 - Installation failed.
 
-Technical administrators can record installation notes and test results.
+Provider technicians record installation notes and test results; a provider administrator (or a provider technician other than the installer, per provider setting) marks the installation **verified**. For immobilizer installations, verification additionally requires the evidence listed in Module 12, and the platform may require a platform technical admin review for a provider's first immobilizer installations (configurable).
 
 ### Module 9 — Trip history and route playback
 
@@ -452,6 +520,8 @@ Event-based notification system supporting:
 
 Channels: in-app, email, SMS, WhatsApp — behind a provider abstraction. **Start with in-app and email**; keep SMS and WhatsApp configurable for later.
 
+Notifications to end customers carry their provider's name and logo. Providers also receive operational notifications about their fleet of devices (device never connected, offline for long periods, power cut, installation awaiting verification, a customer's security command failed). SMS/WhatsApp messages cost money: who pays (provider credits or included allowance) is a plan setting.
+
 ### Module 12 — Vehicle immobilization and security (premium feature)
 
 Remote immobilization is implemented **only** for compatible devices with **professionally installed** immobilization systems, as a **stationary starter-inhibit function — never an engine shutdown mechanism while driving.**
@@ -487,6 +557,13 @@ Command states:
 PENDING · SENT · ACKNOWLEDGED · EXECUTED · FAILED · EXPIRED · CANCELLED
 ```
 
+Responsibilities in the provider model:
+
+- **Provider:** installs the relay on the starter circuit, records the installation evidence, verifies it, enables the feature per vehicle, trains its customer, and provides first-line emergency restoration.
+- **End customer:** requests immobilization/restoration through the safety workflow (permission + step-up + confirmation + reason).
+- **Platform:** enforces the safety gate and state machine for every provider, maintains which device models/firmware can support the feature, can disable the feature for a provider or device, and keeps the immutable audit trail.
+- The feature is off by default for every provider; a provider must accept specific terms (installation standards and liability) before enabling it.
+
 Testing: use a controlled test device and professional installation procedures. Do not implement live engine shutdown.
 
 ### Module 13 — Driver management
@@ -500,39 +577,98 @@ Testing: use a controlled test device and professional installation procedures. 
 
 Reports: daily / weekly / monthly movement, distance travelled, trip history, vehicle utilization, idle time, overspeeding, geofence violations, driver activity, device connectivity, security events, immobilization history. ("Fleet Performance" in the navigation is served by this module.)
 
-Report features: date filters, vehicle filters, driver filters, PDF export, Excel export, CSV export. Useful visualizations with Recharts — from real data only.
+Report features: date filters, vehicle filters, driver filters, PDF export, Excel export, CSV export. Useful visualizations with Recharts — from real data only. Exported reports carry the provider's branding.
 
-### Module 15 — Subscription and billing
+Provider reports: active devices per customer and per month (matches the platform invoice), device connectivity health across customers, installations by status and technician, alerts by customer, security commands by customer.
 
-Configurable subscription packages (examples, not fixed): **Starter** 1–3 vehicles · **Business** 4–20 · **Professional** 21–50 · **Enterprise** custom limits.
+### Module 15 — Provider subscription and billing
 
-Pricing dimensions the platform administrator can configure (extension brief):
+**The platform bills providers, not end customers.** Providers set their own prices and bill their customers outside the platform.
 
-- Number of vehicles; number of GPS devices.
-- Live tracking; historical tracking period.
-- Geofencing; reports and analytics; driver management.
-- Security features; remote immobilization.
-- API access.
+Billing unit: **active device per month** — a device that is assigned to a vehicle (or transmitting) at any time during the billing month, as defined precisely in an ADR (e.g. count of devices with an active assignment or data received during the month). Simulated/sandbox devices are never billable. Suspended end customers' devices remain billable only if the provider keeps them connected (rule configurable).
+
+Configurable provider plans (structure, not fixed prices — see `PRICING_RESEARCH.md` for the current hypothesis):
+
+- Volume tiers of price per active device (graduated), a minimum monthly fee, and optional prepaid device bundles.
+- Feature entitlements per plan: live tracking; historical tracking period; geofencing; reports and analytics; driver management; security features; remote immobilization; API access; number of provider staff users; branding level.
+- Trial (length, device limit), grace period, suspension rules.
+
+A **speed-governor add-on** is billed per governed vehicle (Module 18) on top of the active-device fee, because governed vehicles produce 5-second data, mandatory SMS and regulator reporting.
+
+Providers can pass plan limits down to their customers (e.g. give one customer 30-day history and another 180 days, within the provider's own plan).
 
 **Never hardcode subscription prices or plan limits.**
 
-Support: monthly and annual subscriptions, vehicle-based pricing, upgrades, downgrades, trial periods, expiry, grace periods, invoices, payment history, payment reminders.
+Support: monthly and annual billing, upgrades, downgrades, trial periods, expiry, grace periods, usage statements (which devices were billed and why), invoices, payment history, payment reminders, and suspension after the grace period (end customers then see a neutral "service temporarily unavailable — contact your provider" message; GPS data keeps being received so nothing is lost).
 
 Payments:
 
 - Multiple payment providers behind an abstraction. Initial Rwanda providers to investigate: **MTN Mobile Money**, **Flutterwave**. Future international providers via the same abstraction.
 - Never assume a payment succeeded from a frontend response. Verify via authenticated server-side verification and provider webhooks.
 
-### Module 16 — Customer management (platform administration)
+### Module 16 — Provider management (platform administration)
 
-Platform administrators can: register customers, view organizations, manage customer accounts, view registered vehicles, view subscriptions, suspend and reactivate accounts, view payments, view customer activity, manage GPS device assignments, view support requests.
+Platform administrators can: review and approve provider registrations, view providers and their end customers, manage provider accounts and plans, view active-device usage, view invoices and payments, suspend and reactivate providers, view provider activity, assist with device assignments and diagnostics, manage support requests from providers, and move an end customer between providers (with consent and audit).
 
-### Module 17 — GPS tracking reseller management
+### Module 17 — Provider console and branding (core module)
 
-A reseller can: register and manage their own customers, assign GPS devices, manage customer vehicles, view subscriptions, monitor device status, manage their business branding.
+A provider can: register and manage its own end customers, invite and manage their users, assign GPS devices, manage customer vehicles, set per-customer feature limits, suspend/reactivate a customer, monitor device status across all customers, manage staff, view its usage and invoices, and manage its branding.
 
-- Resellers must never access another reseller's customers.
-- White-label capabilities are designed now for future implementation.
+- Providers must never access another provider's customers, devices or data.
+- **Branding (first release):** logo, colours, display name, support phone/email/WhatsApp, terms and privacy links shown in the customer app and login page; notification emails carry the provider's name and logo (sent from the platform's domain).
+- **Branding (later phase, design now):** provider's own domain with TLS, branded email sender domain, branded SMS sender ID, branded mobile apps.
+- End customers never see the platform's brand except a small, configurable "powered by" mention and legal pages where required.
+
+### Module 18 — Speed governor compliance *(added 4 Nov 2026)*
+
+**Why.** In Rwanda, public transport and goods transport vehicles must be fitted with speed governors (Presidential Order N° 25/01 of 25/02/2015, article 30 bis). RURA's *Public Notice on Minimum Requirements for Road Speed Governor Supply and Installation for Public and Goods Transport* (30 July 2020) sets what an authorised speed governor supplier must provide. That includes a tracking platform that records and transmits speed data, real-time violation alarms to the supplier **and to RURA**, RURA access to the platform, automated SMS alerts, and quarterly online/offline reports. A national standard is in draft (WTO notification G/TBT/N/RWA/905) and may change these rules (Appendix B16).
+
+Speed-governor suppliers are therefore a natural group of **providers**, and their customers are bus, minibus, school-bus and truck operators. This module lets a RURA-authorised supplier meet the platform-side requirements on our platform, hosted in Rwanda.
+
+**Division of responsibility**
+
+- The **governor hardware** limits speed on the vehicle: it warns the driver with a buzzer, then progressively reduces engine power at the set speed, and is failsafe. The platform never does this remotely.
+- The **platform** records, stores, transmits, alerts, reports and supports inspection. In the first release it **never changes a governor's set speed or calibration remotely** and never sends engine-power commands. Set-speed changes are made on the vehicle by the supplier's authorised technician and recorded in the platform.
+- The **provider** (authorised supplier) holds the RURA authorisation, installs, calibrates, seals, maintains and inspects governors, and answers to RURA.
+
+**RURA requirement → platform feature** (from the 2020 notice; exact wording and Annex A to be confirmed — Appendix B13)
+
+| RURA notice requirement | Platform feature |
+|---|---|
+| Speed recorded in km/h at intervals of **no more than 5 seconds**, each entry with GPS coordinates; date dd/mm/yyyy, 24-hour time | Ingest and keep high-frequency records for governed vehicles; governor reports and exports always use dd/mm/yyyy and 24-hour time |
+| Record and transmission format per **Annex A** | Export and transmission in the Annex A format once obtained (B13) |
+| Off-board storage: speed data relayed in real time to the supplier's data storage system | Our platform is that storage system for the provider; real-time ingestion via Traccar |
+| On-board non-erasable memory retaining 72 driving hours after a power cut | Hardware requirement; record in the catalogue whether each governor model meets it; support upload of on-board data after reconnection where the device supports it |
+| **Every violation transmitted in real time to the supplier and to RURA's storage system, with an alarm to both** | Violation detection; real-time alarm to the provider; regulator transmission outbox (interface to be obtained — B13); delivery status per violation |
+| Supplier provides RURA **access to its platform/dashboard** | Read-only **Regulator portal** (§12), scoped as below |
+| Automated SMS to the client on any change, including devices going offline | SMS mandatory for governed vehicles: offline, back online, tamper, violation summary (configurable) |
+| **Quarterly report** of online/offline periods | Quarterly connectivity report per provider and per vehicle, reproducible from stored connectivity periods |
+| Failsafe; interference easy to detect; checked by an authorised officer | Tamper and disconnection events (power cut, speed-signal loss, device removal where the hardware reports them); inspection support view |
+| Accuracy and function checked at least **every 6 months**, at motor vehicle inspection | Inspection records, due dates and reminders to provider and customer |
+| RURA-approved installation sticker on each vehicle; 12-month minimum warranty; manuals; calibration equipment held only by authorised personnel | Installation record: sticker serial, seal number, set speed, calibration date and technician, warranty end, manual versions; calibration done only by provider technicians with a specific permission |
+| Subscriber databases **not transferred, stored or processed outside Rwanda**; access to customer information logged | Production hosting in Rwanda for this data (in practice the whole platform); access logging already required (§13) |
+| Supplier documents infrastructure, outsourced systems, access levels, backups, disaster recovery, incident management, QoS (availability, MTTR, uptime) | Platform **compliance pack** that providers attach to their RURA application, describing our hosting, backups, DR, incident process, measured uptime and access controls |
+| Listed tracking-platform features: GPS speed limiter, geofence-based speed limit, geofencing, power reporting, motion detection, SOS, ignition detection and disabling, speed reporting, periodic reporting, idle alarm, anti-jamming | Mostly covered by Modules 3, 10, 11 and 14. "Ignition disabling" is offered **only** as Module 12's stationary starter-inhibit. "Geofence-based speed limit" is a device-side configuration: later phase only, after RURA confirms it is allowed and the device behaviour is verified. Jamming alarms are shown where the device reports them |
+
+**Regulator access**
+
+- New organization type `REGULATOR` with read-only users (e.g. RURA, and the traffic police if required).
+- Scope: only vehicles enrolled as **governed** (public passenger or goods transport) by providers that are authorised governor suppliers.
+- Visible data: installation and inspection records, violations (time, speed, set speed, location), tamper events, connectivity periods and quarterly reports, plus a live view of governed vehicles if RURA requires it.
+- Not visible: private vehicles, geofences, unrelated history, or providers' commercial data.
+- Every regulator access is audit-logged and visible to the provider. The legal basis and scope are to be confirmed (B11, B13).
+
+**Data and performance**
+
+- At 5-second records, one governed vehicle produces 12 records a minute; **1,000 governed vehicles ≈ 200 positions/s**, the M3b load target. Governor providers make the scale proof a real requirement, not a hypothetical one.
+- Retention of governor records must meet RURA's requirement, which is to be confirmed (B14). History must stay retrievable for inspections and investigations even if the customer leaves the provider; record the rule in an ADR.
+
+**Pricing:** governed vehicles cost more to serve (data volume, mandatory SMS, regulator reporting), so the speed-governor service is priced as an add-on per governed vehicle (Module 15, `PRICING_RESEARCH.md`).
+
+**Sources:**
+- RURA notice (PDF): https://www.rura.rw/fileadmin/user_upload/RURA/Documents/Sectors/Transport/Regulatory_instruments/Transport_Regulations_and_Guidelines/Guideline_requirements_for_road_speed_governor_supply_and_installations_for_public_and_goods_transport.pdf
+- RURA transport regulations list: https://www.rura.rw/sectors/transport/regulatory-instruments/regulations-and-guidelines
+- Draft standard summary (TÜV): https://www.tuv.com/regulations-and-standards/en/rwanda-maximum-road-speed-governors-for-motor-vehicles-requirements.html
 
 ---
 
@@ -559,6 +695,14 @@ Repeatable test scenarios:
 - Invalid GPS coordinates.
 - Out-of-order position messages.
 
+Speed-governor scenarios *(rev. 1.2, for M9)*:
+
+- Governed vehicle reporting every 5 seconds along a route.
+- Vehicle reaching its set speed: speed plateaus at the set speed as the governor cuts power.
+- Recorded speed above the set speed (violation), e.g. downhill or a faulty governor.
+- Power cut or speed-signal disconnection (tamper), then reconnection with upload of buffered records.
+- Device offline for longer than the threshold, then back online (SMS to the customer, connectivity period recorded).
+
 Rules:
 
 - The simulator must clearly identify simulated devices and simulated positions.
@@ -574,6 +718,10 @@ Rules:
 Design a normalized PostgreSQL schema. Initial domain model (not a requirement to create every table immediately):
 
 `users`, `organizations`, `organization_members`, `roles`, `permissions`, `role_permissions`, `countries`, `currencies`, `vehicles`, `vehicle_categories`, `drivers`, `gps_devices`, `gps_device_models`, `gps_manufacturers`, `gps_device_capabilities`, `device_assignments`, `positions`, `trips`, `geofences`, `alerts`, `notification_preferences`, `notifications`, `immobilization_commands`, `security_events`, `subscriptions`, `subscription_plans`, `invoices`, `payments`, `payment_transactions`, `resellers`, `audit_logs`, `support_tickets`.
+
+Provider-model entities *[Added in revision 1.1 — names are proposals]*: `organizations.type` (`PLATFORM | PROVIDER | CUSTOMER`) with `parent_organization_id` replacing the separate `resellers` table; `provider_profiles` (legal details, approval status, approved by/at, terms and DPA acceptance); `provider_branding` (logo, colours, display name, support contacts, legal links, future custom domain); `provider_staff_scopes` (which customers a staff member may access); `customer_entitlements` (per-customer limits set by the provider within its plan); `billing_usage_snapshots` (active devices per provider per day/month, with the device list, so invoices can be explained); `provider_feature_terms` (e.g. accepted immobilization terms); `customer_transfers` (moves between providers, with consent).
+
+Speed-governor entities *[rev. 1.2 — proposals]*: `vehicles.use_class` (`PRIVATE | PUBLIC_PASSENGER | GOODS | SCHOOL_BUS | OTHER`); `governor_installations` (vehicle, device, governor make/model, set speed, RURA sticker serial, seal number, calibration date and technician, warranty end, status); `governor_inspections` (date, inspector, result, next due date); `governor_violations` (start/end, peak and set speed, location, duration, regulator delivery status); `governor_tamper_events`; `device_connectivity_periods` (online/offline intervals, the source of the quarterly report); `regulator_outbox` (payload in the Annex A format, attempts, delivered at, error); `regulator_access_grants` (regulator org, provider, scope, granted by/at); `compliance_reports` (quarter, provider, generated file, checksum).
 
 Entities implied by the extension brief *[Added in consolidation — names are proposals]*: device hardware revisions / firmware versions, protocols, network technologies, compatibility records with verification status and last-tested date, supported configuration commands, device activation status history, device inventory (serial, supplier, purchase date, warranty), suppliers, technicians, installation jobs with status history, installation test results, device maintenance records, plan entitlements/limits (pricing dimensions), country settings (tax, formats, providers), notification rules.
 
@@ -623,7 +771,7 @@ Clean, versioned REST API. Base path: **`/api/v1`**. Document every endpoint in 
 | **Geofencing** | `GET /geofences` · `POST /geofences` · `PATCH /geofences/:id` · `DELETE /geofences/:id` |
 | **Security** | `POST /vehicles/:id/immobilize` · `POST /vehicles/:id/restore` · `GET /vehicles/:id/security-history` |
 | **Reports** | `GET /reports/fleet-summary` · `GET /reports/distance` · `GET /reports/trips` · `GET /reports/overspeeding` · `GET /reports/vehicle-utilization` |
-| **Subscriptions** | `GET /subscriptions` · `POST /subscriptions` · `GET /subscriptions/:id` · `POST /subscriptions/:id/upgrade` |
+| **Subscriptions** | `GET /subscriptions` · `POST /subscriptions` · `GET /subscriptions/:id` · `POST /subscriptions/:id/upgrade` — these refer to the **provider's** subscription with the platform |
 
 *[Added in consolidation — proposals required by extension-brief features; finalise in `docs/API_DESIGN.md`]*
 
@@ -636,7 +784,14 @@ Clean, versioned REST API. Base path: **`/api/v1`**. Document every endpoint in 
 | **Diagnostics (technical admin)** | `GET /admin/devices/:id/diagnostics` |
 | **Inventory and installations** | `GET/POST /admin/inventory/devices` · `GET/POST /installations` · `PATCH /installations/:id/status` · `POST /installations/:id/test-results` |
 | **Notifications** | `GET /notifications` · `PATCH /notifications/:id/read` · `GET/PUT /notification-preferences` · `GET/POST/PATCH/DELETE /alert-rules` |
-| **Payments** | `POST /payments` (initiate) · `POST /webhooks/payments/:provider` (verified webhook) · `GET /invoices` |
+| **Payments** | `POST /payments` (initiate) · `POST /webhooks/payments/:paymentGateway` (verified webhook) · `GET /invoices` · `GET /billing/usage` (active devices for a period) |
+| **Provider onboarding** *(1.1)* | `POST /providers/register` (public) · `GET /admin/providers` · `POST /admin/providers/:id/approve` · `POST /admin/providers/:id/reject` · `POST /admin/providers/:id/suspend` |
+| **Provider console** *(1.1)* | `GET/POST /provider/customers` · `GET/PATCH /provider/customers/:id` · `POST /provider/customers/:id/suspend` · `POST /provider/customers/:id/invitations` · `PUT /provider/customers/:id/entitlements` · `POST /provider/devices/import` (CSV, validated, idempotent) · `GET/PUT /provider/branding` · `GET/POST /provider/staff` |
+| **Speed governors** *(1.2)* | `GET/POST /provider/governor-installations` · `PATCH /provider/governor-installations/:id` · `POST /provider/governor-installations/:id/inspections` · `GET /governor/violations` (customer and provider) · `GET /provider/compliance-reports?quarter=` · `POST /provider/compliance-reports/:quarter/generate` · `GET /provider/regulator-outbox` |
+| **Regulator portal** *(1.2)* | `GET /regulator/vehicles` · `GET /regulator/vehicles/:id` · `GET /regulator/violations` · `GET /regulator/tamper-events` · `GET /regulator/compliance-reports` — read-only, scoped by `regulator_access_grants`, every call audited |
+| **Branding (public)** *(1.1)* | `GET /branding/resolve?host=…` or `?slug=…` — returns logo/colours/name for the login page, no authentication, no sensitive data |
+
+Note: the word "provider" is reserved for GPS tracking providers. External services (payments, SMS, maps) are called **gateways** or **integrations** in routes and code to avoid confusion (see the `gps-external-integrations` skill).
 
 ---
 
@@ -652,18 +807,43 @@ Study the design quality and usability of **Samsara, Wialon, Geotab and Traccar*
 
 **Priorities** (extension brief): live vehicle visibility, vehicle status, fleet utilization, security alerts, trip information, device health, operational performance.
 
-**Customer navigation (suggested sidebar):**
+**Three interfaces** (one React app, separate shells, routes and navigation):
+
+1. **Customer app** — under the provider's brand.
+2. **Provider console** — under the provider's brand, with the provider's own navigation.
+3. **Platform admin** — under the platform's brand, visibly marked as internal.
+4. **Regulator portal** *(rev. 1.2)* — read-only, platform-branded, for RURA: governed vehicles, violations, tamper events, inspections, connectivity and quarterly reports, filtered by provider. No editing, no commands.
+
+The provider console gains a **COMPLIANCE** group for governor suppliers: Governed Vehicles · Installations & Inspections · Violations · Tamper Events · Quarterly Reports · Regulator Deliveries.
+
+**Customer app navigation (suggested sidebar):**
 
 ```
 OVERVIEW      Dashboard · Live Tracking
 FLEET         Vehicles · Drivers · GPS Devices · Trips · Geofences
 SECURITY      Alerts · Vehicle Security · Immobilization History
 ANALYTICS     Reports · Fleet Performance
-BUSINESS      Subscription · Billing · Invoices
 SETTINGS      Organization · Users & Permissions · Notifications · Integrations
+HELP          Contact <provider name> (phone, email, WhatsApp)
 ```
 
-**Platform administration navigation** must be **distinct** from the customer interface (extension brief). *[Added in consolidation — proposal]*: Customers · Organizations & Resellers · Device Catalogue · Inventory · Installations · Device Diagnostics · Subscriptions & Plans · Payments · Support Tickets · Audit Log · Platform Settings (countries, currencies, providers).
+(The base brief's BUSINESS group — Subscription · Billing · Invoices — moves to the provider console, because end customers do not pay the platform.)
+
+**Provider console navigation** *[Added in revision 1.1 — proposal]*:
+
+```
+OVERVIEW      Dashboard · Live Map (all customers)
+CUSTOMERS     Customers · Users & Invitations · Customer Limits
+DEVICES       Devices · Import · Onboarding Queue · Diagnostics · Device Catalogue
+FIELD         Installations · Technicians · Stock
+SUPPORT       Alerts by Customer · Security Commands · Support Requests
+BUSINESS      Usage · Plan · Invoices · Payments
+SETTINGS      Branding · Staff & Permissions · Notifications · API (later)
+```
+
+**Platform administration navigation** must be **distinct** from the other interfaces (extension brief). *[Proposal]*: Providers (approvals, accounts) · End Customers (search, support) · Device Catalogue · Device Diagnostics · Plans & Pricing · Usage & Invoices · Payments · Support Requests · Audit Log · Platform Settings (countries, currencies, gateways).
+
+**Branding resolution** *[Proposal]*: in the first release each provider gets a login address on the platform's domain (e.g. `<provider-slug>.<platform-domain>` with a wildcard certificate, or `<platform-domain>/p/<slug>`). The login page loads the provider's branding from that address; after login, branding follows the user's organization. The platform's main domain shows the platform's brand (for provider sign-up and platform staff). Provider-owned custom domains come later.
 
 Show menu items based on permissions. Design clear workflows for both customers and technical administrators.
 
@@ -699,6 +879,9 @@ Additional rules:
 - Do not hardcode API credentials; use environment variables and secure configuration.
 - Do not sacrifice security for convenience (Rule 11).
 - Design location-data access, retention, permissions and customer consent with Rwanda's data protection law and future markets' privacy requirements in mind.
+- Provider staff access to an end customer's location history, live view and security commands is permission-checked and audit-logged; end-customer owners can see an access log of provider and platform staff actions on their account.
+- Provider branding assets (logos) are validated (type, size, no SVG scripts) and served from a safe origin.
+- A provider's suspension must never expose its customers' data to anyone else, and never silently delete data.
 
 ---
 
@@ -709,7 +892,8 @@ Each integration is a module with a clear provider abstraction, independently co
 | Category | Integrations |
 |---|---|
 | **GPS** | Traccar REST API, Traccar WebSocket |
-| **Maps** | Mapbox GL JS, Mapbox Geocoding, optional alternative map providers |
+| **Maps** | Prototype: MapLibre GL JS + OpenFreeMap (no key; no satellite; no reverse geocoding — show coordinates). Production: Mapbox GL JS + Mapbox Geocoding, or an alternative vendor, decided in M11 |
+| **Regulator** *(rev. 1.2)* | RURA speed-governor data transmission (violations in real time; Annex A format). Interface unknown: build an outbox with a clearly labelled development adapter until RURA provides the specification (B13) |
 | **Payments** | MTN Mobile Money, Flutterwave, future international providers |
 | **Notifications** | Email provider, SMS provider, WhatsApp Business Platform |
 
@@ -796,18 +980,20 @@ Create:
 
 | # | Milestone | Scope | Working deliverable |
 |---|---|---|---|
-| **M1** | Foundation | Frontend and backend projects; PostgreSQL + Prisma; initial migrations; authentication (register, login, logout, password recovery, email verification, sessions); organizations; users; roles and permissions; tenant isolation foundation; Docker development environment | Users can register, log in, create organizations and manage users; tenant isolation and permission tests pass |
-| **M2** | Traccar integration and GPS device registration | Traccar in Docker; Traccar client service (REST + auth handling); device registration and synchronization; minimal vehicle record and device assignment; position retrieval; Traccar WebSocket integration; GPS event processing; basic simulated device | The application retrieves GPS positions from Traccar for a registered device |
-| **M3** | GPS simulator and complete ingestion pipeline | Full scenario simulator (§9); normalization, validation, out-of-order/delayed/invalid handling; latest-state cache; vehicle status derivation; GPS data storage strategy decided and implemented | Every §9 scenario runs repeatably through the real pipeline with automated assertions |
-| **M4** | Live tracking on Mapbox | Live tracking page; Mapbox; markers and clustering; status; real-time updates; selection; search/filter; info panel | A vehicle moves on the map as new coordinates arrive; another organization cannot see it (completes Success Milestone 1, §20) |
-| **M5** | Vehicle management, compatibility catalogue, onboarding | Full vehicle management; device management and reassignment history; driver management; vehicle categories; device compatibility and certification catalogue; onboarding workflow and activation statuses; diagnostics tools; main dashboard on real data | A customer onboards a (simulated or real) device end-to-end and sees its effective capabilities |
+| **M1** | Foundation and provider hierarchy | Frontend and backend projects; PostgreSQL + Prisma; initial migrations; authentication (login, logout, password recovery, email verification, sessions, invitations); **three-level tenancy (platform → provider → end customer)**; provider self-registration and platform approval; provider staff; provider creates end customers and invites their users; roles and permissions for all three levels; basic provider branding on login and app shell (logo, colours); tenant isolation foundation; Docker development environment | A provider registers and is approved, creates two customers and invites their users; each sees only its own data; another provider sees nothing of the first; isolation and permission tests pass |
+| **M2** | Traccar integration and GPS device registration | Traccar in Docker; Traccar client service (REST + auth handling); device registration by a provider (single + CSV import) and synchronization; global IMEI uniqueness; minimal vehicle record for a customer and device assignment; position retrieval; Traccar WebSocket integration; GPS event processing; basic simulated device | The application retrieves GPS positions from Traccar for a device registered by a provider |
+| **M3a** | GPS simulator and ingestion pipeline — correctness *(split 2 Nov 2026)* | Full scenario simulator (§9); normalization, validation, out-of-order/delayed/invalid/implausible handling; latest-state cache held by the ingestion leader with guarded batched writes; vehicle status derivation; offline sweeper; authenticated Socket.IO fan-out; alerts; GPS data storage strategy (ADR marked "pending M3b"); steady-traffic smoke test (50 devices, 10 s, 2 min) added to the done-check | Every §9 scenario runs repeatably through the real pipeline with automated assertions; smoke test passes |
+| *(M3b)* | *Scale proof — moved into M11* | 200 positions/s load test, report-latency and RLS benchmarks, on a quiet Linux host with the load generator on a separate machine | *See M11* |
+| **M4** | Live tracking map | Live tracking page for end customers and the all-customers live map for providers; **MapLibre GL JS with OpenFreeMap styles for the prototype** (no key, no cost), map setup isolated in one module so production can switch to Mapbox; markers and clustering; status; real-time updates; selection; search/filter (incl. by customer for providers); info panel | A vehicle moves on the map as new coordinates arrive; its customer and its provider see it; other customers and other providers cannot (completes Success Milestone 1, §20) |
+| **M5** | Vehicle management, catalogue, device onboarding, provider console | Full vehicle management (incl. vehicle use class: private, public passenger, goods); device management and reassignment history; driver management; vehicle categories; device compatibility and certification catalogue (shared, platform-managed) **including the device type "speed governor / speed limiter" and high-frequency (≤ 5 s) reporting**; provider device onboarding workflow and activation statuses; onboarding queue; diagnostics tools; provider dashboard and customer dashboard on real data; per-customer limits set by the provider | A provider onboards a (simulated or real) device end-to-end for a customer; the customer sees its effective capabilities |
 | **M6** | Trips, playback, geofencing | Historical tracking; route playback; trip reports; geofence creation; enter/exit/dwell events; notification rules on geofences | Users replay a trip and receive geofence events from simulator scenarios |
 | **M7** | Vehicle security and safe immobilization | Device capability detection and gating; vehicle security dashboard; command authorization; immobilization and restoration workflows; safety verification; acknowledgement and execution tracking; expiry/cancellation; audit history; emergency procedures; controlled test device | The full command workflow is tested (automated + bench/controlled test device); no live engine shutdown exists anywhere |
 | **M8** | Notifications, reports, analytics | In-app and email notifications; SMS and WhatsApp abstractions; all reports; PDF, Excel, CSV exports; Recharts visualizations | Alerts reach users through configured channels; reports export correctly from real data |
-| **M9** | Installation, subscriptions, payments, resellers | Inventory and installation management; subscription plans and entitlements; payment integration with verified webhooks; customer billing; invoices; payment reminders; customer administration; reseller architecture | A customer subscribes and pays (provider sandbox); a reseller manages only its own customers |
-| **M10** | Production and launch | Production Docker; Nginx; SSL; logging; monitoring; backups; security review and testing; performance optimization; deployment documentation; commercial launch | Platform deployed to production with documented runbooks; **Success Milestone 2** (physical tracker in a real vehicle) achieved if not earlier |
+| **M9** | Speed governor compliance *(added 4 Nov 2026 — Module 18)* | Governor installation records (set speed, RURA sticker, seal, calibration, warranty, 6-monthly inspections with reminders); ≤ 5 s speed records retained and retrievable; violation and tamper detection with real-time alarms to the provider; automated SMS to the customer on device offline and other changes; quarterly online/offline report per provider; read-only **Regulator portal** for RURA; regulator transmission outbox with a clearly labelled development adapter until RURA's interface and Annex A format are obtained; compliance pack (hosting, backups, DR, QoS, access logging) for providers' RURA applications; simulator governor scenarios | A simulated governed bus exceeds its set speed: the violation reaches the provider alarm, the customer SMS and the regulator outbox within the target time; a disconnection produces a tamper/offline event; the quarterly report reproduces online/offline periods exactly; the regulator sees only enrolled governed vehicles |
+| **M10** | Installations, provider billing, platform administration | Provider inventory and installation management with verification; provider plans and entitlements (incl. speed-governor add-on); active-device usage metering with explainable statements; payment integration (MTN MoMo / Flutterwave sandbox) with verified webhooks and reconciliation; invoices; payment reminders; grace period and suspension; provider management in platform admin; customer transfer between providers | A provider's monthly invoice matches its active devices, is paid through a payment sandbox, and late payment leads to the documented grace/suspension behaviour without data loss |
+| **M11** | Scale proof and production launch | **M3b scale proof** (load ≥ 200 positions/s — the rate of about 1,000 governed vehicles reporting every 5 s — report latency, RLS benchmark; confirm or amend the two ADRs) on a production-like Linux host; production map source chosen (Mapbox or alternative); production Docker; Nginx; SSL; logging; monitoring; backups with tested restore; hosting in Rwanda (B1, Module 18); security review and testing; deployment documentation; commercial launch | Platform deployed to production with documented runbooks and measured capacity; **Success Milestone 2** (physical tracker in a real vehicle) achieved if not earlier |
 
-Appendix A.2 shows how the base brief's Phases 1–9 map onto M1–M10.
+Appendix A.2 shows how the base brief's Phases 1–9 map onto the milestones. **Ordering note:** M9 depends on SMS and reports (M8). If a speed-governor supplier becomes the first committed customer, M9 may move ahead of M7, bringing the SMS gateway and the quarterly report with it; record the change in `docs/DEVELOPMENT_ROADMAP.md`.
 
 ---
 
@@ -851,6 +1037,7 @@ Do not start coding random components. Act as the solution architect first:
 12. Identify which Traccar features and commands are supported by the selected test hardware.
 13. Define how live GPS tracking will be tested without initially depending on physical hardware (§9).
 14. Define the secure and safe architecture for remote vehicle immobilization (Module 12).
+15. *(Revision 1.1)* Design the three-level tenancy (platform → provider → end customer), provider onboarding and approval, branding resolution, and active-device billing measurement; record each as an ADR.
 
 After presenting the architectural analysis, **begin Milestone 1**. Do not stop after writing documentation. Do not move to the next milestone until the current one has been implemented, tested and documented.
 
@@ -858,19 +1045,21 @@ After presenting the architectural analysis, **begin Milestone 1**. Do not stop 
 
 ## 20. Definition of success
 
-**Success Milestone 1** (reached at the end of M4):
+**Success Milestone 1** (reached at the end of M4; adapted to the provider model):
 
-1. A user can register and log in.
-2. A user can create an organization.
-3. An administrator can register a vehicle.
-4. An administrator can register a GPS device.
+1. A GPS provider can register, and a platform admin can approve it.
+2. The provider can log in and create an end-customer organization, and the customer's user can accept an invitation and log in under the provider's branding.
+3. The provider can register a vehicle for that customer.
+4. The provider can register a GPS device.
 5. A GPS device can be connected through Traccar.
 6. Our backend can retrieve its location.
-7. Our frontend can display the vehicle on Mapbox.
+7. Our frontend can display the vehicle on the map (MapLibre in the prototype) — for the end customer and in the provider's all-customers map.
 8. The vehicle position updates automatically.
-9. Another organization cannot access that vehicle's data.
+9. Another end customer of the same provider, and any other provider, cannot access that vehicle's data.
 
-**Success Milestone 2:** a physical GPS tracker installed in a real vehicle sends its coordinates to our server and the vehicle appears in our own application. *(Can be attempted as soon as M4 is complete and test hardware is available; it is required before M7's controlled-device testing.)*
+**Success Milestone 2:** a physical GPS tracker installed in a real vehicle **by a real provider** sends its coordinates to our server and the vehicle appears in the provider's console and in its customer's app. *(Can be attempted as soon as M4 is complete and test hardware is available; it is required before M7's controlled-device testing.)*
+
+**Success Milestone 3 — speed governors** *(rev. 1.2, end of M9; then with real hardware)*: a governed vehicle of a RURA-authorised supplier reports speed at least every 5 seconds; a violation raises the provider alarm, reaches the regulator outbox (or RURA itself once the interface exists) and appears in the Regulator portal; an offline period triggers the customer SMS and appears correctly in the quarterly report.
 
 **Long-term objective:** a fully operational commercial GPS tracking and fleet management SaaS platform that can be deployed, sold, maintained and expanded internationally.
 
@@ -917,8 +1106,8 @@ Do not build merely to demonstrate functionality.
 | Module 10 Drivers | Module 13 |
 | Module 11 Reporting | Module 14 |
 | Module 12 Subscription and billing | Module 15 (+ pricing dimensions, extension §6) |
-| Module 13 Customer management | Module 16 |
-| Module 14 Reseller management | Module 17 |
+| Module 13 Customer management | Module 16 (now Provider management — rev. 1.1) |
+| Module 14 Reseller management | Module 17 (now Provider console and branding, a core module — rev. 1.1) |
 
 ### A.2 Phases (base brief) → Milestones (extension brief)
 
@@ -926,22 +1115,23 @@ Do not build merely to demonstrate functionality.
 |---|---|---|
 | Phase 0 Analysis | Phase 0 | Kept — the extension brief has no equivalent and does not remove it |
 | Phase 1 Foundation | M1 | Same scope |
-| Phase 2 Traccar integration | M2 + M3 | The extension brief splits out the simulator and ingestion pipeline as its own milestone |
+| Phase 2 Traccar integration | M2 + M3a (M3b in M11) | The extension brief splits out the simulator and ingestion pipeline as its own milestone; split again on 2 Nov 2026 |
 | Phase 3 Live tracking | M4 | Same scope |
 | Phase 4 Vehicle and fleet management | M5 (+ minimal vehicle/device in M2) | M5 adds the catalogue and onboarding |
 | Phase 5 Trips and geofencing | M6 | Same scope |
 | Phase 6 Security and immobilization | M7 | Same scope |
 | Phase 7 Notifications and reports | M8 | Same scope |
-| Phase 8 Commercial features | M9 | M9 adds installation management |
-| Phase 9 Production readiness | M10 | M10 adds security testing and commercial launch |
+| Phase 8 Commercial features | M10 | Adds installation management |
+| Phase 9 Production readiness | M11 | Adds the M3b scale proof, security testing and commercial launch |
+| — | M9 | Speed governor compliance (added 4 Nov 2026; not in either brief) |
 
 ### A.3 Conflicts and how they were resolved
 
 1. **Phase plan vs milestone sequence.** The base brief defines Phases 0–9; the extension brief defines Milestones 1–10 and says to "prioritize" them. *Resolution:* milestones are authoritative; Phase 0 is retained in front of M1.
 2. **Success Milestone 1 vs milestone order.** Success Milestone 1 requires "an administrator can register a vehicle", but full vehicle management is M5. *Resolution:* M2 introduces a minimal vehicle record (registration number, organization) so a device can be assigned and shown on the map in M4; M5 completes vehicle management.
-3. **Simulator timing.** The base brief places "development mode with simulated devices" in Phase 2; the extension brief makes the simulator its own milestone (M3). *Resolution:* one basic simulated device in M2 to prove the connection; the full scenario simulator in M3.
+3. **Simulator timing.** The base brief places "development mode with simulated devices" in Phase 2; the extension brief makes the simulator its own milestone (M3). *Resolution:* one basic simulated device in M2 to prove the connection; the full scenario simulator in M3 (now M3a; scale proof M3b in M11).
 4. **Device management timing.** The base brief puts device management in Phase 4; the extension brief puts device *registration* in M2 and the catalogue/onboarding in M5. *Resolution:* register-and-sync in M2; full device lifecycle, reassignment history, catalogue and onboarding in M5.
-5. **Driver management and customer management** are not named in the extension brief's milestones. *Resolution:* drivers in M5 (base brief Phase 4); customer administration in M9 (base brief Phase 8).
+5. **Driver management and customer management** are not named in the extension brief's milestones. *Resolution:* drivers in M5 (base brief Phase 4); customer administration in M10 (base brief Phase 8).
 6. **Main dashboard timing.** The base brief lists the dashboard as Module 2; the extension brief says not to build dashboards before GPS integration works. *Resolution:* M1 delivers only the application shell and empty states; the KPI dashboard is built in M5 when real data exists.
 7. **Activation statuses mix lifecycle and connectivity.** "Online" and "Offline" describe connectivity while the other statuses describe onboarding lifecycle; a suspended device can still be online. *Resolution:* the user-facing list is kept exactly; internally it should be modelled as a lifecycle status plus a derived connectivity state (decide in Phase 0 / ADR).
 8. **Capability lists differ.** The base brief's example JSON has 7 keys; the extension brief lists more (battery, digital inputs, network technologies, configuration commands). *Resolution:* the catalogue uses the union.
@@ -949,6 +1139,26 @@ Do not build merely to demonstrate functionality.
 10. **Command cancellation.** The base brief lists a CANCELLED state; the extension brief adds "cancellation where technically possible". No cancel endpoint existed. *Resolution:* proposed endpoint added in §11.
 11. **"Fleet Performance"** appears in the base brief's sidebar but no module defines it. *Resolution:* served by Module 14 (Reporting).
 12. **Distinct admin interface.** The base brief gives only the customer sidebar; the extension brief requires distinct customer and admin navigation. *Resolution:* a proposed admin navigation is added in §12.
+
+### A.4 Owner decisions of 1 November 2026 — provider-first platform
+
+| Decision | Effect on this spec |
+|---|---|
+| The platform is for **GPS tracking providers only**; we do not sell devices, installation or tracking to vehicle owners | Model A removed (§2.3); "purchase devices from us" and "request installation" removed from end-customer features; inventory/installations become provider-run (Module 8) |
+| **End customers log in themselves**, created and invited by their provider | No public sign-up for end customers (Module 1); provider console creates customers and invitations (Module 17) |
+| **Branding: provider logo + colours** in the first release; own domain/apps later | Branding module and resolution (Module 17, §12); custom domains designed for later |
+| **The platform bills providers per active device**; providers bill their customers outside the platform | Module 15 rewritten; end-customer billing screens removed from the customer app (§12) |
+| Resellers become the core | "Reseller" renamed "Provider"; three-level tenancy required from M1 (§6, §17.4); reseller roles replaced by provider roles (§7) |
+
+Brief text that conflicts with these decisions has been rewritten in place; nothing else from the briefs was removed.
+
+### A.5 Owner decisions of 2–4 November 2026 (revision 1.2)
+
+| Decision | Effect on this spec |
+|---|---|
+| **M3 split**: correctness (M3a) completed; scale proof (M3b) postponed to before launch, on a quiet Linux host | §17.4: M3a row; M3b folded into M11 |
+| **Maps**: free MapLibre + OpenFreeMap for the prototype; Mapbox (or another vendor) for production | §4, §14, M4 and M11 rows; B6 widened |
+| **Speed governors** added to the roadmap | New Module 18; new milestone M9; old M9 → M10 and old M10 → M11; Regulator organization type, roles, portal and API; open questions B13–B16 |
 
 ---
 
@@ -963,10 +1173,17 @@ These must be verified (and recorded in `docs/OPEN_QUESTIONS.md` with outcome an
 | B3 | **Traccar version and API details** (authentication method, WebSocket behaviour, command queuing for offline devices, trip/stop report settings, geofence dwell support, retention settings). | The integration must match the deployed version. | Pin the Traccar Docker image version; verify against that version's documentation and API reference; record in `docs/GPS_INTEGRATION.md`. |
 | B4 | **Mobile network and SIM** (operators' 2G/3G/4G coverage and any network sunset plans; M2M/IoT SIM plans; APN settings; SMS sender ID registration). | Device choice (LTE vs 2G) and device configuration. | Confirm with MTN Rwanda and Airtel Rwanda. |
 | B5 | **Payment providers** (MTN MoMo and Flutterwave API versions, webhook signing, sandbox access, fees, settlement, merchant onboarding requirements). | Module 15. | Provider documentation and merchant agreements. |
-| B6 | **Mapbox pricing and terms** (map loads, geocoding volumes, rules on storing geocoding results). | Cost model and whether trip addresses can be cached/stored. | Mapbox pricing page and terms of service. |
+| B6 | **Production map vendor, pricing and terms** (Mapbox or alternative: map loads, satellite, geocoding volumes, rules on storing geocoding results; whether sending vehicle coordinates to a foreign geocoding service is acceptable under B1 and Module 18). | Cost model, whether trip addresses can be cached/stored, data localisation. | Vendor pricing pages and terms; decide in M11. |
 | B7 | **WhatsApp Business Platform** requirements (business verification, template approval, pricing). | Module 11. | Meta documentation. |
 | B8 | **Immobilizer installation standards** (vehicle warranty, insurance, any local regulation on aftermarket immobilizers). | Module 12 liability and installation procedures. | Installer partners, insurers, legal advice. |
 | B9 | **Tax rules** (VAT applicability and invoice requirements, e.g. electronic billing obligations). | Module 15 invoices. | Rwanda Revenue Authority guidance / accountant. |
+| B10 | **RURA licensing.** At least one Rwandan tracking company states it is licensed by RURA to provide GPS vehicle tracking and telematics services. | Determines whether the platform, each provider, or both need a licence (and which category), and whether provider approval should check a provider's licence. | Ask RURA (ICT licensing) and a lawyer; record the answer and any licence numbers to collect during provider approval. |
+| B11 | **Data protection roles.** In the provider model the provider is likely the data controller for its customers' data and the platform a data processor — to be confirmed. | Contract structure (data processing agreement with each provider), registration with the NCSA data protection office, breach-notification duties, who answers data-subject requests. | Lawyer familiar with Law No. 058/2021. |
+| B12 | **Migrating providers' existing devices.** Providers' trackers currently report to other platforms; moving them means changing each device's server address and port (often by SMS or a configuration tool), and some devices may be locked by the previous vendor. | Onboarding effort, bulk configuration tooling, and sales promises. | Test on each shortlisted model; collect the configuration commands per model in the catalogue. |
+| B13 | **RURA speed-governor data interface.** The 2020 notice refers to an **Annex A** (record format and minimum data) that is not in the published PDF, and requires violations to reach "the Regulatory Authority storage system" in real time without saying how. | Module 18 transmission, export format and the Regulator portal scope. | Request Annex A and the transmission specification (API, protocol, credentials, test environment) from RURA's transport department; ask whether portal access alone is enough until then. |
+| B14 | **Speed-governor rules still in force**: which vehicle classes must have governors and their set speeds, retention period for speed records, inspection procedure, sticker and seal rules, and whether amendments since 2020 apply. | Data model, retention, reminders and reports. | RURA and Rwanda National Police; also check the public transport bus (2021) and school bus (2023) regulations for tracking requirements. |
+| B15 | **Governor hardware and protocols.** Which governor/limiter models Rwandan suppliers use, whether Traccar decodes them, and how they report set speed, limiting events, tamper and power-cut signals, and on-board data uploads. | Catalogue entries, violation and tamper detection accuracy. | Ask 2–3 authorised suppliers for their models and documentation; bench-test with Traccar; record findings in the catalogue. |
+| B16 | **Draft national speed-governor standard** (WTO notification G/TBT/N/RWA/905; entry into force to be determined). | May replace the 2020 notice's requirements. | Obtain the draft from the Rwanda Standards Board or the WTO notification portal; track adoption. |
 
 ---
 
@@ -985,6 +1202,8 @@ The repository ships Claude Code skills in `.claude/skills/`. Each loads automat
 | `gps-simulator` | Building or running the simulator and scenario tests |
 | `gps-device-catalogue` | Device catalogue, capabilities, onboarding, activation, assignment history, inventory, installations |
 | `gps-immobilization-safety` | Anything related to immobilization, restoration or vehicle commands |
-| `gps-provider-adapters` | Payments, email/SMS/WhatsApp, maps/geocoding, webhooks |
+| `gps-provider-model` | Anything about GPS providers: registration, approval, branding, provider console, end-customer management, active-device billing |
+| `gps-external-integrations` | Payment gateways, email/SMS/WhatsApp, maps/geocoding, webhooks, regulator transmission |
+| `gps-speed-governor-compliance` | Speed governors, governed vehicles, violations, tamper events, inspections, quarterly reports, Regulator portal, RURA transmission |
 | `gps-fleet-ui` | Any frontend page, component, map or chart |
 | `gps-done-check` | Before claiming any task, module or milestone is done |

@@ -13,9 +13,7 @@ The spec says: *do not claim a feature is complete until it has been implemented
 pnpm -r typecheck                 # tsc --noEmit everywhere; zero errors
 pnpm -r lint                      # eslint incl. @typescript-eslint/no-explicit-any; zero errors
 pnpm -r test                      # unit + component tests
-pnpm test:infra:up                # the ISOLATED test stack (compose project gps-test); `pnpm test` starts it itself. `pnpm test:reset` rebuilds it from scratch
-pnpm --filter api test:e2e        # API e2e incl. tenant-isolation and permission suites (serial; own stack, own key prefix per suite)
-pnpm --filter api test:smoke      # STEADY-TRAFFIC SMOKE TEST (~3 min) — mandatory for any change touching the pipeline, caches, fan-out, persistence, ingestion or the simulator; at a milestone boundary always
+pnpm --filter api test:e2e        # API e2e incl. tenant-isolation and permission suites
 pnpm --filter api prisma migrate status
 pnpm --filter api prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$SHADOW_DATABASE_URL" --exit-code
                                   # schema and migrations in sync (non-zero exit = missing migration);
@@ -23,9 +21,21 @@ pnpm --filter api prisma migrate diff --from-migrations prisma/migrations --to-s
 pnpm -r build
 docker compose -f infra/docker-compose.dev.yml up -d && <smoke test script>
 pnpm sim scenario <relevant scenarios>   # for anything touching GPS data, tracking, alerts, geofences
+pnpm sim smoke                    # steady traffic: 50 devices, 10 s interval, 2 min (100 governed at 5 s from M9)
 ```
 
-**Steady-traffic smoke test (from M3a on).** 50 simulated devices, 10 s interval, 2 minutes, production defaults. Pass criteria, all required: routing-cache hit rate > 90 %; p95 position-to-socket < 2 s (engine feed emit → browser socket, so the engine's own buffering is not counted against the platform); every position delivered, counting only its own vehicles; no failed requests, socket drops or pipeline errors; every cache lifetime comes from configuration and exceeds the reporting interval. Put the measured numbers in the report. A run in which the load generator itself fell behind is invalid, not a pass.
+**Steady-traffic smoke test (every milestone from M3a on).** Lesson from M3: a 5-second cache in front of devices reporting every 10 seconds never hit, and M2's tests could not notice because they never sent steady traffic. Pass criteria:
+- cache hit rate > 90%
+- p95 position-to-socket latency < 2 s
+- no errors
+- the load generator counts only its own vehicles' deltas
+
+**Test hygiene (lessons from M3):**
+- Tests run in a separate compose project with wiped volumes.
+- Each suite has its own Redis key prefix and ingestion lease name.
+- Every test deletes what it created, and `pnpm test:reset` rebuilds the test stack.
+- Load-test data never goes into the development database.
+- Profile before optimising.
 
 Check also:
 
@@ -35,8 +45,6 @@ Check also:
 - Swagger reflects new/changed endpoints.
 - For UI changes: the verification list in `gps-fleet-ui` §10.
 - For tenant data: the isolation tests in `gps-tenant-isolation` §7 exist for the new endpoints.
-- Tests ran against the isolated test stack (never the development services), each test file in its own Redis namespace, and no orphaned `jest` processes are left running (a hung run is a failing run that leaked apps).
-- No cache on the position path has a lifetime shorter than the reporting interval, and every cache lifetime is configurable.
 - For immobilization: every test in `gps-immobilization-safety` §8 passes.
 
 ## 2. Documentation to update
@@ -86,14 +94,14 @@ Never write "fully working", "complete" or "production-ready" without the eviden
 
 | Milestone | Must be demonstrably true |
 |---|---|
-| M1 | Register, verify email, log in/out, reset password; create organization; invite/manage users; roles enforce permissions; tenant isolation + permission tests pass; docker dev environment starts with one command |
-| M2 | Pinned Traccar runs in compose; device registered via our API appears in Traccar; minimal vehicle + assignment; a (basic simulated) device's position retrieved through our API; WebSocket consumer receives and maps positions; unknown devices dropped |
-| M3a | All simulator scenarios pass in CI against real Traccar; status derivation tested; leader-owned live state with fenced writes, failover test, deadline-indexed sweeper; steady-traffic smoke test passes; storage strategy ADR written and implemented |
-| M3b | (before M10, separate Linux host) 200 positions/s at p95 < 2 s ours; Traccar report latency vs dataset size; RLS/transaction overhead; ADR-0003 and ADR-0004 confirmed or amended |
-| M4 | Live map shows vehicles moving from socket updates without page refresh; clustering; filters/search; info panel; org B cannot see org A (UI + API + socket tests) — Success Milestone 1 met |
-| M5 | Vehicle, driver, category management; device reassignment with history; catalogue managed by platform admin; effective capabilities visible to customers; onboarding paths A and B with activation statuses; diagnostics; dashboard on real data |
+| M1 | Provider registers, verifies email, is approved by a platform admin; provider creates two customers and invites their users; invited users log in under the provider's logo/colours; staff roles and scopes enforce permissions; log in/out, reset password, sessions; three-level isolation + permission tests pass (P1/C1/C2 vs P2/C3); docker dev environment starts with one command |
+| M2 | Pinned Traccar runs in compose; device registered by a provider (single and CSV dry-run/commit) appears in Traccar; global IMEI uniqueness with neutral error; minimal vehicle for a customer + assignment; a (basic simulated) device's position retrieved through our API; WebSocket consumer maps positions to provider and customer; unknown devices dropped |
+| M3a | All simulator scenarios pass against real Traccar; status derivation tested; leader-held latest state with lease-token-guarded batched writes and a failover test; sweeper on a sorted set of offline deadlines; storage ADR written ("pending M3b"); steady-traffic smoke test passes |
+| M4 | Customer live map and provider all-customers map (MapLibre + OpenFreeMap, map setup in one module) show vehicles moving from socket updates without page refresh; clustering; filters/search (incl. by customer); info panel; ~1,000 simulated vehicles stay smooth; other customers and other providers cannot see them (UI + API + socket tests) — Success Milestone 1 met |
+| M5 | Vehicle (incl. use class), driver, category management; device reassignment with history; catalogue managed by platform admin incl. speed-governor device type; effective capabilities visible to end customers; provider device onboarding with activation statuses and onboarding queue; diagnostics; provider and customer dashboards on real data; per-customer limits |
 | M6 | Trip list and playback; geofence CRUD synced to Traccar (lat/lon test); enter/exit/dwell events from scenarios; notification rules |
 | M7 | Gate + state machine + restoration + audit implemented with all tests; bench and controlled-vehicle tests recorded; no engine-stop path exists (code search proves it) |
 | M8 | In-app + email delivered from real alerts; SMS/WhatsApp adapters behind interfaces; all reports with PDF/XLSX/CSV from real data |
-| M9 | Inventory + installation workflow with verification; plans/entitlements configurable; payments via provider sandbox with verified webhooks and reconciliation; invoices; customer admin; reseller isolation tests |
-| M10 | Production compose, Nginx, TLS, backups with a tested restore, monitoring/alerting, security review, load test results, runbooks; hosting decision consistent with data-protection verification |
+| M9 | Speed governor compliance per `gps-speed-governor-compliance` §9: governed-vehicle 5 s ingestion passes the smoke test; violation episodes and tamper events detected; provider alarm, customer SMS and regulator outbox within target time; inspections with reminders; quarterly report reproducible; Regulator portal scoped and audited; no remote set-speed change path exists — Success Milestone 3 (simulated) met |
+| M10 | Provider inventory + installation workflow with verification; provider plans/entitlements configurable (incl. governor add-on); active-device snapshots reproduce the invoice exactly; payments via gateway sandbox with verified webhooks and reconciliation; grace and suspension keep ingesting data; provider management in platform admin; customer transfer with consent and audit |
+| M11 | M3b scale proof on a quiet Linux host with the load generator on a separate machine (≥ 200 positions/s, report latency, RLS) and the two ADRs confirmed or amended; production map source chosen; production compose, Nginx, TLS, backups with a tested restore, monitoring/alerting, security review, runbooks; hosting in Rwanda consistent with data-protection and RURA verification |

@@ -21,3 +21,23 @@ export const invitationTemplate = (baseUrl: string, token: string, organizationN
   subject: `You have been invited to ${organizationName}`,
   text: `${inviter} invited you to join ${organizationName}.\n\nAccept the invitation:\n${baseUrl}/accept-invitation?token=${token}\n\nThe invitation expires automatically.`,
 });
+
+export const providerApprovedTemplate = (baseUrl: string, company: string): Template => ({
+  subject: `${company} has been approved`,
+  text: `Your provider account for ${company} has been approved.\n\nSign in to create your customers, register devices and set up your branding:\n${baseUrl}/login`,
+});
+
+export const providerRejectedTemplate = (company: string, reason: string): Template => ({
+  subject: `Your registration of ${company}`,
+  text: `We could not approve the provider registration of ${company}.\n\nReason: ${reason}\n\nIf you think this is a mistake, reply to this message.`,
+});
+
+export const providerSuspendedTemplate = (company: string, reason: string): Template => ({
+  subject: `${company} has been suspended`,
+  text: `The provider account of ${company} has been suspended.\n\nReason: ${reason}\n\nYour customers' vehicles are still being tracked and no data is lost. Contact us to restore access.`,
+});
+
+export const customerOwnerInvitationTemplate = (baseUrl: string, token: string, customerName: string, providerName: string): Template => ({
+  subject: `${providerName} created a tracking account for ${customerName}`,
+  text: `${providerName} has set up vehicle tracking for ${customerName} and invited you to manage it.\n\nAccept the invitation:\n${baseUrl}/accept-invitation?token=${token}\n\nThe link works once and expires.`,
+});

@@ -32,10 +32,10 @@ import { StatusBadge, STATUS_ICON } from './status-badge';
 import type { ConnectionState } from './useLiveFeed';
 
 const CONNECTION_COPY: Record<ConnectionState, { label: string; className: string }> = {
-  connecting: { label: 'Connecting…', className: 'bg-surface-2 text-text-muted' },
-  live: { label: 'Live', className: 'bg-ok-soft text-ok' },
-  reconnecting: { label: 'Reconnecting…', className: 'bg-warn-soft text-warn' },
-  refused: { label: 'Disconnected', className: 'bg-danger-soft text-danger' },
+  connecting: { label: 'Connecting…', className: 'bg-[#EDF2F7] text-[#718096]' },
+  live: { label: 'Live', className: 'bg-[#E6F7F0] text-[#16A36A]' },
+  reconnecting: { label: 'Reconnecting…', className: 'bg-[#FEF6E6] text-[#B7791F]' },
+  refused: { label: 'Disconnected', className: 'bg-[#FDEEEE] text-[#DC5555]' },
 };
 
 function absolute(iso: string | null, timeZone: string): string {
@@ -113,78 +113,90 @@ function MonitorView() {
   const connection = CONNECTION_COPY[feed.connection];
 
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
         title="Pipeline monitor"
         description="Diagnostics for the position pipeline (Milestone 3a): what the platform holds for this organization, the raw live feed, alert rules and the thresholds in force. The map is under Live tracking."
+        actions={
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" role="status" aria-live="polite">
+            <span className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold', connection.className)}>
+              <span aria-hidden className={cn('size-2 rounded-full bg-current', feed.connection === 'live' && 'animate-live-pulse')} />
+              {connection.label}
+            </span>
+            <span className="text-text-muted">
+              Tracking engine: {feed.engineConnected === null ? 'waiting for status' : feed.engineConnected ? 'connected' : 'unavailable'}
+            </span>
+            <span className="text-text-muted tabular-nums">
+              Live messages received: {feed.messages}
+              {feed.lastMessageAt ? ` · last ${agoLabel(new Date(feed.lastMessageAt).toISOString(), now)}` : ''}
+            </span>
+          </div>
+        }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]" role="status" aria-live="polite">
-        <span className={cn('inline-flex items-center gap-2 rounded-sm px-2.5 py-1 font-medium', connection.className)}>
-          <span aria-hidden className={cn('size-2 rounded-full bg-current', feed.connection === 'live' && 'motion-safe:animate-pulse')} />
-          {connection.label}
-        </span>
-        <span className="text-text-muted">
-          Tracking engine: {feed.engineConnected === null ? 'waiting for status' : feed.engineConnected ? 'connected' : 'unavailable'}
-        </span>
-        <span className="text-text-muted tabular-nums">
-          Live messages received: {feed.messages}
-          {feed.lastMessageAt ? ` · last ${agoLabel(new Date(feed.lastMessageAt).toISOString(), now)}` : ''}
-        </span>
-      </div>
-
-      {feed.connection === 'refused' && <div className="mb-4"><Alert tone="danger">The live connection was closed by the server. Reload the page or sign in again.</Alert></div>}
-      {feed.engineConnected === false && <div className="mb-4"><Alert tone="warn">The tracking engine is unavailable. Positions below may be out of date until it reconnects.</Alert></div>}
+      {feed.connection === 'refused' && <div><Alert tone="danger">The live connection was closed by the server. Reload the page or sign in again.</Alert></div>}
+      {feed.engineConnected === false && <div><Alert tone="warn">The tracking engine is unavailable. Positions below may be out of date until it reconnects.</Alert></div>}
 
       {/* Status counts: from the API (one shared status function), not computed here. */}
-      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
         <button
           type="button"
           aria-pressed={statusFilter === null}
           onClick={() => setStatusFilter(null)}
-          className={cn('h-9 rounded-md border px-3 text-[13px]', statusFilter === null ? 'border-brand bg-brand-soft font-medium text-brand' : 'border-border bg-surface hover:bg-surface-2')}
+          className={cn(
+            'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] transition-all duration-150',
+            statusFilter === null
+              ? 'border-[#B8CEFF] bg-[#EEF3FF] font-bold text-[#2458E8]'
+              : 'border-border bg-surface font-medium text-text hover:bg-surface-2',
+          )}
         >
-          All <span className="ml-1 tabular-nums">{summary.data ? summary.data.total : '—'}</span>
+          All <span className={cn('ml-0.5 tabular-nums font-bold', statusFilter === null ? 'text-[#2458E8]' : 'text-text-muted')}>{summary.data ? summary.data.total : '—'}</span>
         </button>
         {VEHICLE_STATUSES.map((s) => {
           const Icon = STATUS_ICON[s];
+          const active = statusFilter === s;
           return (
             <button
               key={s}
               type="button"
-              aria-pressed={statusFilter === s}
+              aria-pressed={active}
               title={STATUS_META[s].hint}
-              onClick={() => setStatusFilter(statusFilter === s ? null : s)}
-              className={cn('inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px]', statusFilter === s ? 'border-brand bg-brand-soft font-medium text-brand' : 'border-border bg-surface hover:bg-surface-2')}
+              onClick={() => setStatusFilter(active ? null : s)}
+              className={cn(
+                'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] transition-all duration-150',
+                active
+                  ? 'border-[#B8CEFF] bg-[#EEF3FF] font-bold text-[#2458E8]'
+                  : 'border-border bg-surface font-medium text-text hover:bg-surface-2',
+              )}
             >
               <Icon className="size-3.5" aria-hidden />
               {STATUS_META[s].label}
-              <span className="ml-1 tabular-nums">{counts ? counts[s] : '—'}</span>
+              <span className={cn('ml-0.5 tabular-nums font-bold', active ? 'text-[#2458E8]' : 'text-text-muted')}>{counts ? counts[s] : '—'}</span>
             </button>
           );
         })}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <Card className="overflow-hidden lg:col-span-2">
           <CardHeader
             title="Vehicles"
             description="Latest known state per vehicle. Unknown values are shown as Unknown or —, never as 0 or Off."
             action={
-              <div className="relative w-48">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-text-faint" aria-hidden />
-                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search registration" aria-label="Search by registration number" className="h-9 pl-8" />
+              <div className="relative w-56">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-faint" aria-hidden />
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search registration" aria-label="Search by registration number" className="h-9 pl-9 text-xs" />
               </div>
             }
           />
           {positions.isPending ? (
-            <div className="space-y-2 p-5">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
+            <div className="space-y-2.5 p-6">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
             </div>
           ) : positions.isError ? (
-            <div className="p-5">
+            <div className="p-6">
               <Alert tone="danger">{describeError(positions.error)}</Alert>
               <Button className="mt-3" variant="secondary" size="sm" onClick={() => void positions.refetch()}>Try again</Button>
             </div>
@@ -216,37 +228,37 @@ function MonitorView() {
                   ))}
                 </tbody>
               </Table>
-              {total > rows.size && <p className="border-t border-border px-4 py-2 text-xs text-text-muted">Showing the {rows.size} most recently active of {total} vehicles.</p>}
+              {total > rows.size && <p className="border-t border-border/70 px-6 py-3 text-xs font-medium text-text-muted">Showing the {rows.size} most recently active of {total} vehicles.</p>}
             </>
           )}
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {canAlerts && (
             <Section title="Alerts" description="Most recent first. Raised only where an alert rule exists.">
               {alerts.isPending ? (
-                <Skeleton className="m-5 h-16" />
+                <Skeleton className="m-6 h-16" />
               ) : alerts.isError ? (
-                <div className="p-5"><Alert tone="danger">{describeError(alerts.error)}</Alert></div>
+                <div className="p-6"><Alert tone="danger">{describeError(alerts.error)}</Alert></div>
               ) : alerts.data.data.length === 0 ? (
                 <EmptyState title="No alerts" description={rules.data && rules.data.length > 0 ? 'Nothing has triggered a rule yet.' : 'There are no alert rules, so no alerts are raised. Add the demo rules below to see some.'} />
               ) : (
-                <ul className="divide-y divide-border">
+                <ul className="divide-y divide-border/60">
                   {alerts.data.data.map((a) => (
-                    <li key={a.id} className="flex items-start justify-between gap-3 px-5 py-3 text-[13px]">
+                    <li key={a.id} className="flex items-start justify-between gap-3 px-6 py-3.5 text-[13px]">
                       <div>
-                        <p className="font-medium">
+                        <p className="font-bold text-text">
                           {ALERT_TYPE_LABEL[a.type]} <span className="font-normal text-text-muted">· {a.registrationNumber}</span>
                         </p>
                         <p className="mt-0.5 text-xs text-text-muted" title={absolute(a.startedAt, timeZone)}>{agoLabel(a.startedAt, now)}</p>
-                        <div className="mt-1 flex flex-wrap gap-1">
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
                           <Badge tone={a.severity === 'CRITICAL' ? 'danger' : a.severity === 'WARNING' ? 'warn' : 'neutral'}>{a.severity.toLowerCase()}</Badge>
                           {a.simulated && <Badge tone="brand">Simulated</Badge>}
                           {a.delayed && <Badge tone="warn">Delayed data</Badge>}
                         </div>
                       </div>
                       {a.acknowledgedAt ? (
-                        <span className="text-xs text-text-muted">Acknowledged</span>
+                        <span className="text-xs font-medium text-text-muted">Acknowledged</span>
                       ) : (
                         canAck && <Button size="sm" variant="secondary" loading={acknowledge.isPending && acknowledge.variables === a.id} onClick={() => acknowledge.mutate(a.id)}>Acknowledge</Button>
                       )}
@@ -259,13 +271,13 @@ function MonitorView() {
 
           <Section title="Live feed" description="What arrives over the socket, newest first.">
             {log.length === 0 ? (
-              <p className="px-5 py-4 text-[13px] text-text-muted">Waiting for the first live update…</p>
+              <p className="px-6 py-4 text-[13px] text-text-muted">Waiting for the first live update…</p>
             ) : (
-              <ul className="max-h-72 divide-y divide-border overflow-y-auto">
+              <ul className="max-h-72 divide-y divide-border/60 overflow-y-auto">
                 {log.map((e) => (
-                  <li key={e.id} className="flex gap-3 px-5 py-2 text-xs">
+                  <li key={e.id} className="flex gap-3 px-6 py-2.5 text-xs">
                     <span className="shrink-0 tabular-nums text-text-faint">{clockLabel(e.at, timeZone)}</span>
-                    <span className={cn(e.kind === 'alert' && 'font-medium text-danger', e.kind === 'engine' && 'text-warn')}>{e.text}</span>
+                    <span className={cn(e.kind === 'alert' && 'font-semibold text-danger', e.kind === 'engine' && 'font-medium text-warn')}>{e.text}</span>
                   </li>
                 ))}
               </ul>
@@ -275,9 +287,9 @@ function MonitorView() {
           {canAlerts && (
             <Section title="Alert rules">
               {rules.isPending ? (
-                <Skeleton className="m-5 h-12" />
+                <Skeleton className="m-6 h-12" />
               ) : rules.isError ? (
-                <div className="p-5"><Alert tone="danger">{describeError(rules.error)}</Alert></div>
+                <div className="p-6"><Alert tone="danger">{describeError(rules.error)}</Alert></div>
               ) : rules.data.length === 0 ? (
                 <EmptyState
                   title="No alert rules"
@@ -291,48 +303,48 @@ function MonitorView() {
                   }
                 />
               ) : (
-                <ul className="divide-y divide-border">
+                <ul className="divide-y divide-border/60">
                   {rules.data.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-[13px]">
-                      <span>
+                    <li key={r.id} className="flex items-center justify-between gap-3 px-6 py-3 text-[13px]">
+                      <span className="font-medium text-text">
                         {ALERT_TYPE_LABEL[r.type]}
                         {r.type === 'OVERSPEED' && typeof r.params['speedLimitKmh'] === 'number' ? ` over ${r.params['speedLimitKmh']} km/h` : ''}
                       </span>
-                      <span className="text-xs text-text-muted">{r.enabled ? `cooldown ${r.cooldownSeconds} s` : 'disabled'}</span>
+                      <span className="text-xs font-medium text-text-muted">{r.enabled ? `cooldown ${r.cooldownSeconds} s` : 'disabled'}</span>
                     </li>
                   ))}
                 </ul>
               )}
-              {addDemoRules.isError && <div className="px-5 pb-4"><Alert tone="danger">{describeError(addDemoRules.error)}</Alert></div>}
+              {addDemoRules.isError && <div className="px-6 pb-4"><Alert tone="danger">{describeError(addDemoRules.error)}</Alert></div>}
             </Section>
           )}
 
           <Section title="Thresholds in force" description="From the server; nothing is hard-coded in this page.">
             {config.data ? (
-              <dl className="space-y-2 px-5 py-4 text-[13px]">
+              <dl className="divide-y divide-border/50 px-6 pb-4 text-[13px]">
                 <Row label="Offline after" value={`${config.data.thresholds.offlineAfterSec} s without a message`} />
                 <Row label="Moving from" value={`${config.data.thresholds.movingSpeedKmh} km/h`} />
                 <Row label="Idling after" value={`${config.data.thresholds.idleAfterSec} s stopped, ignition on`} />
                 <Row label="Parked after" value={`${config.data.thresholds.parkedAfterSec} s stopped, ignition unknown`} />
               </dl>
             ) : config.isError ? (
-              <p className="px-5 py-4 text-[13px] text-text-muted">Thresholds are unavailable right now.</p>
+              <p className="px-6 py-4 text-[13px] text-text-muted">Thresholds are unavailable right now.</p>
             ) : (
-              <Skeleton className="m-5 h-16" />
+              <Skeleton className="m-6 h-16" />
             )}
           </Section>
 
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4">
+    <div className="flex justify-between gap-4 py-2.5">
       <dt className="text-text-muted">{label}</dt>
-      <dd className="text-right tabular-nums">{value}</dd>
+      <dd className="text-right font-semibold text-text tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -340,13 +352,13 @@ function Row({ label, value }: { label: string; value: string }) {
 function VehicleTableRow({ row, now, timeZone }: { row: VehicleRow; now: number; timeZone: string }) {
   const receiving = isReceiving(row.lastSeenAt, now);
   return (
-    <tr className="hover:bg-surface-2">
-      <Td className="font-medium">
+    <tr className="transition-colors hover:bg-surface-2/70">
+      <Td className="font-bold text-text">
         <span className="inline-flex items-center gap-2">
           <span
             aria-hidden
             title={receiving ? 'Receiving data now' : undefined}
-            className={cn('size-2 rounded-full', receiving ? 'bg-status-moving motion-safe:animate-pulse' : 'bg-transparent')}
+            className={cn('size-2 rounded-full', receiving ? 'bg-status-moving animate-live-pulse' : 'bg-transparent')}
           />
           {row.registrationNumber}
         </span>
@@ -359,11 +371,11 @@ function VehicleTableRow({ row, now, timeZone }: { row: VehicleRow; now: number;
         )}
       </Td>
       <Td><StatusBadge status={row.status} /></Td>
-      <Td className="text-right tabular-nums">{speedLabel(row.speedKmh)}</Td>
+      <Td className="text-right font-semibold tabular-nums">{speedLabel(row.speedKmh)}</Td>
       <Td>{ignitionLabel(row.ignition)}</Td>
       <Td className="whitespace-nowrap tabular-nums text-text-muted">{coordinatesLabel(row.latitude, row.longitude)}</Td>
-      <Td className="whitespace-nowrap" title={absolute(row.lastFixAt, timeZone)}>{agoLabel(row.lastFixAt, now)}</Td>
-      <Td className="whitespace-nowrap" title={absolute(row.lastSeenAt, timeZone)}>{agoLabel(row.lastSeenAt, now)}</Td>
+      <Td className="whitespace-nowrap text-text-muted" title={absolute(row.lastFixAt, timeZone)}>{agoLabel(row.lastFixAt, now)}</Td>
+      <Td className="whitespace-nowrap text-text-muted" title={absolute(row.lastSeenAt, timeZone)}>{agoLabel(row.lastSeenAt, now)}</Td>
     </tr>
   );
 }

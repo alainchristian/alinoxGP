@@ -47,9 +47,9 @@ export function QueryError({ query, what }: { query: UseQueryResult<unknown>; wh
 
 export function Pager({ page, pageSize, total, onPage }: { page: number; pageSize: number; total: number; onPage: (p: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (total <= pageSize) return <p className="border-t border-border px-4 py-2.5 text-xs text-text-muted">{total} in total</p>;
+  if (total <= pageSize) return <p className="border-t border-border/70 bg-slate-50/40 px-4 py-3 text-xs font-medium text-text-muted">{total} in total</p>;
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 text-xs text-text-muted">
+    <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-slate-50/40 px-4 py-3 text-xs font-medium text-text-muted">
       <span className="tabular">
         Page {page} of {pages} · {total} in total
       </span>
@@ -68,9 +68,9 @@ export function Pager({ page, pageSize, total, onPage }: { page: number; pageSiz
 /** A label/value row for detail panels; a missing value is a dash (unknown), never an invented default. */
 export function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
+    <div className="flex items-baseline justify-between gap-4 border-b border-border/40 py-2 last:border-b-0">
       <dt className="shrink-0 text-text-muted">{label}</dt>
-      <dd className="min-w-0 break-words text-right font-medium">{children ?? '—'}</dd>
+      <dd className="min-w-0 break-words text-right font-medium text-slate-900">{children ?? '—'}</dd>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CreateOrganizationInput, OrganizationDto, UpdateOrganizationInput } from '@gps/shared';
-import { ROLE_KEYS } from '@gps/shared';
+import type { OrganizationDto, UpdateOrganizationInput } from '@gps/shared';
 import { badRequest, notFound } from '../../common/errors';
 import { toOrganizationDto } from '../../common/mappers';
 import { SystemPrismaService, TenantPrismaService } from '../../infrastructure/prisma/prisma.service';
@@ -15,45 +14,6 @@ export class OrganizationsService {
     private readonly access: AccessService,
     private readonly audit: AuditService,
   ) {}
-
-  /**
-   * Creates a CUSTOMER organization with `userId` as its Owner. Runs on the system client because the
-   * user has no tenant context yet (a new organization has no members to authorise anything).
-   */
-  async createForUser(userId: string, input: CreateOrganizationInput): Promise<OrganizationDto> {
-    const country = await this.system.country.findUnique({ where: { code: input.countryCode } });
-    if (!country || !country.enabled) throw badRequest('COUNTRY_NOT_SUPPORTED', 'This country is not available yet');
-    const ownerRole = await this.system.role.findUnique({ where: { key: ROLE_KEYS.ORG_OWNER } });
-    if (!ownerRole) throw new Error('System roles are not seeded (run db:seed)');
-
-    const org = await this.system.$transaction(async (tx) => {
-      const created = await tx.organization.create({
-        data: {
-          type: 'CUSTOMER',
-          name: input.name,
-          legalName: input.legalName,
-          countryCode: country.code,
-          timezone: input.timezone ?? country.defaultTimezone,
-          currencyCode: input.currencyCode ?? country.defaultCurrency,
-          locale: input.locale ?? 'en',
-        },
-      });
-      const member = await tx.organizationMember.create({ data: { organizationId: created.id, userId } });
-      await tx.memberRole.create({
-        data: { organizationId: created.id, memberId: member.id, roleId: ownerRole.id },
-      });
-      return created;
-    });
-    await this.audit.record({
-      action: 'organization.create',
-      organizationId: org.id,
-      actorUserId: userId,
-      targetType: 'organization',
-      targetId: org.id,
-      after: { name: org.name, countryCode: org.countryCode },
-    });
-    return toOrganizationDto(org);
-  }
 
   listForUser(userId: string) {
     return this.access.listMemberships(userId);

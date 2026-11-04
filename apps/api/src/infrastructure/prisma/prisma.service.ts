@@ -69,6 +69,39 @@ export class TenantPrismaService {
   }
 
   /**
+   * Provider-level access (ADR-0010): every row of the provider and of ALL its customers (`app.current_provider_id`).
+   * Only a provider's own staff acting at provider level may call it; staff scoped to some customers must additionally
+   * filter by {@link customerScope} (RLS cannot express a staff member's customer list). Customer-level routes keep using
+   * {@link run}, which exposes exactly one organization.
+   */
+  runAsProvider<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    const tenant = this.cls.get('tenant');
+    if (!tenant) throw new Error('TenantPrismaService.runAsProvider called without tenant context');
+    if (tenant.organizationType !== 'PROVIDER' || tenant.actingAs !== 'MEMBER') {
+      throw new Error('TenantPrismaService.runAsProvider requires provider staff acting at provider level');
+    }
+    return this.runInProvider(tenant.organizationId, fn);
+  }
+
+  /** The customers the current provider staff member may see: undefined = all, otherwise the allowed ids. */
+  customerScope(): readonly string[] | undefined {
+    const tenant = this.cls.get('tenant');
+    if (!tenant) throw new Error('TenantPrismaService.customerScope called without tenant context');
+    return tenant.customerScope === 'ALL' ? undefined : tenant.customerScope;
+  }
+
+  /** Explicit provider-level tenant (background jobs, tests). The caller must have authorised `providerId`. */
+  runInProvider<T>(providerId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.current_provider_id', ${providerId}, true)`;
+        return fn(tx);
+      },
+      { maxWait: 5000, timeout: 10000 },
+    );
+  }
+
+  /**
    * Establish a tenant explicitly (background jobs, tests). The caller is responsible for having
    * authorised `organizationId` (e.g. from a verified membership or a job payload that is re-validated).
    */

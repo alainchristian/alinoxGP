@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/lib/auth-store';
@@ -17,14 +18,17 @@ const me = {
 };
 
 function setup() {
+  // The page shows the provider's branding (a query that stays idle without a ?brand= address).
   return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={['/login']}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/app" element={<p>Customer app home</p>} />
         <Route path="/forgot-password" element={<p>Forgot</p>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

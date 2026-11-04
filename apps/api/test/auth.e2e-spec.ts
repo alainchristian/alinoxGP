@@ -23,10 +23,13 @@ describe('Authentication & sessions (e2e)', () => {
   afterAll(() => ctx.close());
 
   describe('registration & email verification', () => {
-    it('registers, requires email verification before login, then signs in', async () => {
+    const TERMS = 'draft-2026-11';
+    const provider = (email: string, extra: Record<string, unknown> = {}) => ({ email, password: PASSWORD, companyName: 'Ada Tracking Ltd', contactName: 'Ada', acceptedTermsVersion: TERMS, ...extra });
+
+    it('a provider registers, must verify the email before login, then waits for approval', async () => {
       const email = uniqueEmail();
-      const reg = await http(ctx).post(url('/auth/register')).send({ email, password: PASSWORD, fullName: 'Ada', organizationName: 'Ada Transport' });
-      expect(reg.status).toBe(201);
+      const reg = await http(ctx).post(url('/providers/register')).send(provider(email));
+      expect(reg.status).toBe(202);
 
       const before = await login(ctx, email);
       expect(before.status).toBe(403);
@@ -50,24 +53,34 @@ describe('Authentication & sessions (e2e)', () => {
       const me = await http(ctx).get(url('/auth/me')).set(bearer({ accessToken: ok.body.data.accessToken }));
       expect(me.status).toBe(200);
       expect(me.body.data.memberships).toHaveLength(1);
-      expect(me.body.data.memberships[0].roleKeys).toEqual(['ORG_OWNER']);
-      expect(me.body.data.permissions).toContain('billing.manage');
+      expect(me.body.data.memberships[0].roleKeys).toEqual(['PROVIDER_OWNER']);
+      expect(me.body.data.memberships[0].organization.type).toBe('PROVIDER');
+      expect(me.body.data.permissions).toContain('provider.staff.manage');
+      const profile = await ctx.system.providerProfile.findFirstOrThrow({ where: { contactEmail: email } });
+      expect(profile.status).toBe('PENDING_APPROVAL');
+      expect(profile.termsVersion).toBe(TERMS);
+      expect(profile.termsAcceptedAt).not.toBeNull();
     });
 
     it('answers a duplicate registration exactly like a new one (no account enumeration)', async () => {
       const first = await registerUser(ctx);
-      const dup = await http(ctx).post(url('/auth/register')).send({ email: first.email, password: PASSWORD, fullName: 'Other' });
-      const fresh = await http(ctx).post(url('/auth/register')).send({ email: uniqueEmail(), password: PASSWORD, fullName: 'New' });
+      const dup = await http(ctx).post(url('/providers/register')).send(provider(first.email));
+      const fresh = await http(ctx).post(url('/providers/register')).send(provider(uniqueEmail()));
       expect(dup.status).toBe(fresh.status);
       expect(dup.body).toEqual(fresh.body);
       expect(ctx.mail.lastTo(first.email)!.subject).toMatch(/already exists|attempt/i);
     });
 
     it('rejects weak passwords and invalid email with field errors', async () => {
-      const res = await http(ctx).post(url('/auth/register')).send({ email: 'nope', password: 'short', fullName: '' });
+      const res = await http(ctx).post(url('/providers/register')).send({ email: 'nope', password: 'short', companyName: '', contactName: '' });
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_FAILED');
-      expect(res.body.errors.map((e: { path: string }) => e.path).sort()).toEqual(['email', 'fullName', 'password']);
+      expect(res.body.errors.map((e: { path: string }) => e.path).sort()).toEqual(['acceptedTermsVersion', 'companyName', 'contactName', 'email', 'password']);
+    });
+
+    it('has no public sign-up for end customers or bare accounts', async () => {
+      expect((await http(ctx).post(url('/auth/register')).send({ email: uniqueEmail(), password: PASSWORD, fullName: 'X' })).status).toBe(404);
+      expect((await http(ctx).post(url('/organizations')).send({ name: 'Mine' })).status).toBe(404);
     });
   });
 
@@ -87,7 +100,7 @@ describe('Authentication & sessions (e2e)', () => {
       await login(ctx, u.email, 'wrong-wrong-wrong');
       const rows = await ctx.system.auditLog.findMany({ where: { actorUserId: u.id } });
       const actions = rows.map((r) => r.action);
-      expect(actions).toEqual(expect.arrayContaining(['auth.register', 'auth.login', 'auth.login_failed']));
+      expect(actions).toEqual(expect.arrayContaining(['auth.login', 'auth.login_failed']));
       expect(JSON.stringify(rows)).not.toContain(PASSWORD);
     });
 

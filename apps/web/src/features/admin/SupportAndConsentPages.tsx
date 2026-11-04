@@ -24,9 +24,13 @@ export function SupportRequestsPage() {
   return (
     <>
       <PageHeader title="Device support requests" description="Customers whose device is not in the catalogue. Add it to the catalogue (with a recorded test) or decline with a reason." />
-      <Card>
-        <div className="border-b border-border p-3">
-          <Select aria-label="Status" className="w-44" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 px-6 pt-5 pb-4">
+          <div>
+            <h2 className="text-[16px] font-bold tracking-tight text-text">Customer requests</h2>
+            <p className="text-xs text-text-muted">Filter by request resolution status</p>
+          </div>
+          <Select aria-label="Status" className="w-44 bg-surface" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
             <option value="">Any status</option><option value="OPEN">Open</option><option value="RESOLVED">Resolved</option><option value="DECLINED">Declined</option>
           </Select>
         </div>

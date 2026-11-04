@@ -2,16 +2,16 @@ import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ClsService } from 'nestjs-cls';
 import Redis from 'ioredis';
-import type { AuthSessionDto, MeDto, RegisterInput, SessionInfoDto } from '@gps/shared';
+import type { AuthSessionDto, MeDto, SessionInfoDto } from '@gps/shared';
 import { AppException, forbidden, unauthorized } from '../../common/errors';
 import type { AppClsStore } from '../../common/request-context';
 import { ENV, type Env } from '../../infrastructure/config/env';
 import { REDIS } from '../../infrastructure/redis/redis.module';
 import { AccessService } from '../access-control/access.service';
 import { AuditService } from '../audit/audit.service';
-import { alreadyRegisteredTemplate, resetPasswordTemplate, verifyEmailTemplate } from '../messaging/email-templates';
+import { resetPasswordTemplate, verifyEmailTemplate } from '../messaging/email-templates';
 import { EMAIL_PORT, type EmailPort } from '../messaging/email.port';
-import { OrganizationsService } from '../organizations/organizations.service';
+import { ProvidersService } from '../providers/providers.service';
 import { sha256 } from '../users/crypto';
 import { UsersService } from '../users/users.service';
 import { SessionService } from './session.service';
@@ -26,7 +26,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly sessions: SessionService,
     private readonly totp: TotpService,
-    private readonly orgs: OrganizationsService,
+    private readonly providers: ProvidersService,
     private readonly access: AccessService,
     private readonly audit: AuditService,
     private readonly jwt: JwtService,
@@ -47,24 +47,8 @@ export class AuthService {
     return this.cls.get('auth')!.sessionId;
   }
 
-  // ------------------------------------------------------------------ registration & verification
-
-  /** Always answers the same way, whether or not the email is already registered (no enumeration). */
-  async register(input: RegisterInput): Promise<void> {
-    const passwordHash = await this.users.hashPassword(input.password); // hashed first: equal timing either way
-    const existing = await this.users.findByEmail(input.email);
-    if (existing) {
-      await this.email.send({ to: existing.email, ...alreadyRegisteredTemplate(this.env.APP_BASE_URL) });
-      await this.audit.record({ action: 'auth.register_duplicate', actorUserId: existing.id });
-      return;
-    }
-    const user = await this.users.create({ email: input.email, passwordHash, fullName: input.fullName });
-    if (input.organizationName) {
-      await this.orgs.createForUser(user.id, { name: input.organizationName, countryCode: input.countryCode ?? 'RW' });
-    }
-    await this.sendVerification(user.id, user.email, user.fullName);
-    await this.audit.record({ action: 'auth.register', actorUserId: user.id, targetType: 'user', targetId: user.id });
-  }
+  // ------------------------------------------------------------------ verification
+  // Public sign-up is for GPS providers only (POST /providers/register, ProvidersService). End customers are invited.
 
   private async sendVerification(userId: string, email: string, fullName: string) {
     const token = await this.users.issueEmailToken(userId, 'VERIFY_EMAIL');
@@ -76,6 +60,8 @@ export class AuthService {
     if (!userId) throw new AppException('INVALID_OR_EXPIRED_TOKEN', 400, 'This link is invalid or has expired');
     await this.users.markEmailVerified(userId);
     await this.audit.record({ action: 'auth.email_verified', actorUserId: userId });
+    // A provider that registered with this address now waits for platform approval.
+    await this.providers.onEmailVerified(userId);
   }
 
   async resendVerification(email: string): Promise<void> {

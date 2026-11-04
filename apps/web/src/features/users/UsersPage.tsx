@@ -65,12 +65,12 @@ export function UsersPage({ title = 'Users & Permissions' }: { title?: string })
       />
       {actionError && <div className="mb-4"><Alert>{actionError}</Alert></div>}
 
-      <Card className="mb-6">
-        <CardHeader title="Members" />
+      <Card className="mb-6 overflow-hidden">
+        <CardHeader title="Members" description="Active and suspended users in this organization" />
         {members.isPending ? (
-          <div className="space-y-2 p-5"><Skeleton className="h-8" /><Skeleton className="h-8" /><Skeleton className="h-8" /></div>
+          <div className="space-y-2.5 p-6"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
         ) : members.isError ? (
-          <div className="p-5">
+          <div className="p-6">
             <Alert>
               {members.error instanceof ApiError ? errorMessage(members.error.code) : 'Could not load members.'}{' '}
               <button className="underline" onClick={() => members.refetch()}>Retry</button>
@@ -87,12 +87,12 @@ export function UsersPage({ title = 'Users & Permissions' }: { title?: string })
                 const isSelf = m.userId === myUserId;
                 const locked = isOwner || isSelf;
                 return (
-                  <tr key={m.memberId}>
-                    <Td className="font-medium">{m.fullName}{isSelf && <span className="ml-2 text-xs text-text-muted">(you)</span>}</Td>
-                    <Td>{m.email}</Td>
+                  <tr key={m.memberId} className="transition-colors hover:bg-surface-2/70">
+                    <Td className="font-bold text-text">{m.fullName}{isSelf && <span className="ml-2 text-xs font-normal text-text-muted">(you)</span>}</Td>
+                    <Td className="text-text-muted">{m.email}</Td>
                     <Td>
                       {canUpdate && !locked && assignable.length > 0 ? (
-                        <Select aria-label={`Role of ${m.fullName}`} className="h-8 w-52 text-[13px]" value={m.roleKeys[0] ?? ''} disabled={updateMember.isPending}
+                        <Select aria-label={`Role of ${m.fullName}`} className="h-9 w-52 bg-surface text-xs" value={m.roleKeys[0] ?? ''} disabled={updateMember.isPending}
                           onChange={(e) => updateMember.mutate({ memberId: m.memberId, roleKeys: [e.target.value] })}>
                           {assignable.map((r) => <option key={r.key} value={r.key}>{roleLabel(r.key)}</option>)}
                         </Select>
@@ -123,10 +123,10 @@ export function UsersPage({ title = 'Users & Permissions' }: { title?: string })
         )}
       </Card>
 
-      <Card>
-        <CardHeader title="Pending invitations" />
+      <Card className="overflow-hidden">
+        <CardHeader title="Pending invitations" description="Invitations awaiting acceptance" />
         {invitations.isPending ? (
-          <div className="p-5"><Skeleton className="h-8" /></div>
+          <div className="p-6"><Skeleton className="h-10" /></div>
         ) : (invitations.data ?? []).length === 0 ? (
           <EmptyState title="No pending invitations" description={canInvite ? 'Invite a colleague and choose what they can do.' : 'Invitations sent by administrators appear here.'} />
         ) : (
@@ -134,10 +134,10 @@ export function UsersPage({ title = 'Users & Permissions' }: { title?: string })
             <thead><tr><Th>Email</Th><Th>Role</Th><Th>Expires</Th>{canInvite && <Th className="text-right">Actions</Th>}</tr></thead>
             <tbody>
               {invitations.data!.map((i) => (
-                <tr key={i.id}>
-                  <Td>{i.email}</Td>
-                  <Td>{roleLabel(i.roleKey)}</Td>
-                  <Td className="tabular">{formatDateTime(i.expiresAt, me?.memberships.find((m) => m.organization.id === orgId)?.organization.timezone)}</Td>
+                <tr key={i.id} className="transition-colors hover:bg-surface-2/70">
+                  <Td className="font-medium text-text">{i.email}</Td>
+                  <Td><Badge tone="neutral">{roleLabel(i.roleKey)}</Badge></Td>
+                  <Td className="tabular text-text-muted">{formatDateTime(i.expiresAt, me?.memberships.find((m) => m.organization.id === orgId)?.organization.timezone)}</Td>
                   {canInvite && <Td className="text-right"><Button size="sm" variant="ghost" onClick={() => revokeInvitation.mutate(i.id)}>Revoke</Button></Td>}
                 </tr>
               ))}

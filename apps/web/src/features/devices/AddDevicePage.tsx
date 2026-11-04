@@ -78,35 +78,35 @@ function AddDeviceView({ orgId }: { orgId: string }) {
   }
 
   return (
-    <>
-      <Link to="/app/devices" className="mb-3 inline-flex items-center gap-1 text-[13px] text-text-muted hover:text-text"><ArrowLeft className="size-4" aria-hidden /> Devices</Link>
+    <div className="space-y-5">
+      <Link to="/app/devices" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted transition-colors hover:text-slate-900"><ArrowLeft className="size-4" aria-hidden /> Devices</Link>
       <PageHeader title="Add a device" description={step === 'model' ? 'Step 1 of 2 — what kind of device is it?' : 'Step 2 of 2 — identify the device'} />
 
       {step === 'model' ? (
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader title="Choose the model" description="We only list models we have catalogued. What each can do is shown honestly: nothing is assumed from the name." />
           {catalogue.isPending ? (
-            <div className="space-y-2 p-5"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+            <div className="space-y-2.5 p-5"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
           ) : catalogue.isError ? (
             <QueryError query={catalogue} what="the device catalogue" />
           ) : catalogue.data.length === 0 ? (
             <EmptyState title="No models are listed yet" description="You can still register the device without choosing a model, or ask us to support it." />
           ) : (
-            <div className="space-y-4 p-5">
+            <div className="space-y-5 p-5">
               {groupByManufacturer(catalogue.data).map((g) => (
                 <fieldset key={g.manufacturer}>
-                  <legend className="mb-1.5 text-xs font-semibold text-text-muted">{g.manufacturer}</legend>
-                  <div className="space-y-1.5">
+                  <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">{g.manufacturer}</legend>
+                  <div className="space-y-2">
                     {g.models.flatMap((m) =>
                       m.variants.map((v) => {
                         const selected = pick?.variantId === v.id;
                         return (
-                          <label key={v.id} className={`flex cursor-pointer flex-wrap items-center gap-3 rounded-md border px-3 py-2.5 text-[13px] ${selected ? 'border-brand bg-brand-soft' : 'border-border hover:bg-surface-2'}`}>
-                            <input type="radio" name="model" className="size-4" checked={selected} onChange={() => { setPick({ model: m, variantId: v.id }); setUnidentified(false); }} />
+                          <label key={v.id} className={`flex cursor-pointer flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-[13px] transition-all ${selected ? 'border-brand bg-brand-soft/70 shadow-xs' : 'border-border/80 hover:bg-slate-50/70'}`}>
+                            <input type="radio" name="model" className="size-4 accent-brand" checked={selected} onChange={() => { setPick({ model: m, variantId: v.id }); setUnidentified(false); }} />
                             <span className="min-w-0 flex-1">
-                              <span className="font-medium">{modelLabel(m)}</span>
+                              <span className="font-semibold text-slate-900">{modelLabel(m)}</span>
                               <span className="text-text-muted">{v.hardwareRevision ? ` · rev ${v.hardwareRevision}` : ''} · {firmwareRange(v)}</span>
-                              {m.isSimulatorProfile && <span className="block text-xs text-warn">A software simulator, not a physical device. Sandbox organizations only.</span>}
+                              {m.isSimulatorProfile && <span className="mt-0.5 block text-xs font-medium text-warn">A software simulator, not a physical device. Sandbox organizations only.</span>}
                             </span>
                             <Badge tone={COMPATIBILITY_TONE[v.compatibilityStatus]}>{compatibilityLabel(v.compatibilityStatus)}</Badge>
                           </label>
@@ -118,16 +118,16 @@ function AddDeviceView({ orgId }: { orgId: string }) {
               ))}
             </div>
           )}
-          <div className="space-y-2 border-t border-border px-5 py-4 text-[13px]">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input type="radio" name="model" className="size-4" checked={unidentified} onChange={() => { setUnidentified(true); setPick(null); }} />
-              I do not know the model. <span className="text-text-muted">Its capabilities will show as unknown until it is identified.</span>
+          <div className="space-y-2 border-t border-border/70 bg-slate-50/40 px-5 py-4 text-[13px]">
+            <label className="flex cursor-pointer items-center gap-2.5 font-medium text-slate-800">
+              <input type="radio" name="model" className="size-4 accent-brand" checked={unidentified} onChange={() => { setUnidentified(true); setPick(null); }} />
+              I do not know the model. <span className="font-normal text-text-muted">Its capabilities will show as unknown until it is identified.</span>
             </label>
             <p className="text-text-muted">
-              Not in the list? <button className="text-brand underline" onClick={() => setSupportOpen(true)}>Ask us to support your device</button>
+              Not in the list? <button className="font-medium text-brand hover:underline" onClick={() => setSupportOpen(true)}>Ask us to support your device</button>
             </p>
           </div>
-          <div className="flex justify-end border-t border-border px-5 py-3">
+          <div className="flex justify-end border-t border-border/70 px-5 py-3.5">
             <Button disabled={!pick && !unidentified} onClick={() => setStep('details')}>Continue</Button>
           </div>
         </Card>
@@ -147,17 +147,17 @@ function AddDeviceView({ orgId }: { orgId: string }) {
               <Field label="SIM number, ICCID (optional)" htmlFor="dev-sim" error={errors.simIccid?.message} hint="18–22 digits"><Input id="dev-sim" inputMode="numeric" invalid={!!errors.simIccid} {...register('simIccid')} /></Field>
             </div>
             {notice.data && (
-              <div className="rounded-md border border-border bg-surface-2 p-3 text-[13px]">
-                <p className="font-medium">{notice.data.title}</p>
-                {notice.data.isDraftWording && <p className="mt-1 text-xs text-warn">Draft wording — not yet reviewed by a lawyer.</p>}
-                <p className="mt-2 whitespace-pre-wrap text-text-muted">{notice.data.body}</p>
-                <label className="mt-3 flex cursor-pointer items-start gap-2">
-                  <input type="checkbox" className="mt-0.5 size-4" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+              <div className="rounded-lg border border-border/80 bg-slate-50/70 p-4 text-[13px]">
+                <p className="font-semibold text-slate-900">{notice.data.title}</p>
+                {notice.data.isDraftWording && <p className="mt-1 text-xs font-medium text-warn">Draft wording — not yet reviewed by a lawyer.</p>}
+                <p className="mt-2 whitespace-pre-wrap text-text-muted leading-relaxed">{notice.data.body}</p>
+                <label className="mt-3.5 flex cursor-pointer items-start gap-2.5 font-medium text-slate-800">
+                  <input type="checkbox" className="mt-0.5 size-4 accent-brand" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
                   <span>I have read this notice and confirm it applies to this device.</span>
                 </label>
               </div>
             )}
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setStep('model')}>Back</Button>
               <Button type="submit" loading={isSubmitting}>Register device</Button>
             </div>
@@ -165,7 +165,7 @@ function AddDeviceView({ orgId }: { orgId: string }) {
         </Card>
       )}
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
-    </>
+    </div>
   );
 }
 

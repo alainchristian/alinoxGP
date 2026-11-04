@@ -28,6 +28,7 @@ import { LiveStateModule } from './modules/live-state/live-state.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { ProvidersModule } from './modules/providers/providers.module';
 import { MapsModule } from './modules/maps/maps.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { UsersModule } from './modules/users/users.module';
@@ -98,6 +99,7 @@ import { DeviceSupportModule } from './modules/device-support/device-support.mod
     UsersModule,
     AccessControlModule,
     OrganizationsModule,
+    ProvidersModule,
     AuthModule,
     VehiclesModule,
     VehicleCategoriesModule,

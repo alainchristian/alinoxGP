@@ -49,11 +49,24 @@ async function createSuperAdmin() {
   }
 }
 
+/** Operator tooling: the provider that owns sandbox customers when none is named (a customer always belongs to a provider). */
+async function findOrCreateSandboxProvider(prisma: PrismaClient): Promise<string> {
+  const existing = await prisma.organization.findFirst({ where: { type: 'PROVIDER', name: 'Sandbox provider' } });
+  if (existing) return existing.id;
+  const created = await prisma.organization.create({
+    data: { type: 'PROVIDER', name: 'Sandbox provider', countryCode: 'RW', timezone: 'Africa/Kigali', currencyCode: 'RWF', isSandbox: true },
+  });
+  await prisma.providerProfile.create({
+    data: { organizationId: created.id, status: 'ACTIVE', companyName: 'Sandbox provider', contactName: 'Operator', contactEmail: 'sandbox-provider@example.invalid', termsVersion: 'cli', termsAcceptedAt: new Date() },
+  });
+  return created.id;
+}
+
 /** A sandbox organization is the ONLY place simulated devices may exist (development, demos, sales sandbox). */
 async function createSandboxOrg() {
   const name = arg('name')?.trim();
   const ownerEmail = arg('owner-email')?.trim().toLowerCase();
-  if (!name || !ownerEmail) throw new Error('Usage: create-sandbox-org --name <name> --owner-email <existing user email>');
+  if (!name || !ownerEmail) throw new Error('Usage: create-sandbox-org --name <name> --owner-email <existing user email> [--provider-id <uuid>]');
   const url = process.env['DATABASE_URL_SYSTEM'];
   if (!url) throw new Error('DATABASE_URL_SYSTEM is required');
   const prisma = new PrismaClient({ datasourceUrl: url });
@@ -62,9 +75,10 @@ async function createSandboxOrg() {
     const role = await prisma.role.findUnique({ where: { key: ROLE_KEYS.ORG_OWNER } });
     if (!owner) throw new Error(`No user with email ${ownerEmail}. Register first.`);
     if (!role) throw new Error('Reference data missing. Run the seed first (pnpm db:seed).');
+    const providerId = arg('provider-id')?.trim() ?? (await findOrCreateSandboxProvider(prisma));
     const org = await prisma.$transaction(async (tx) => {
       const created = await tx.organization.create({
-        data: { type: 'CUSTOMER', name, isSandbox: true, countryCode: 'RW', timezone: 'Africa/Kigali', currencyCode: 'RWF' },
+        data: { type: 'CUSTOMER', parentOrganizationId: providerId, name, isSandbox: true, countryCode: 'RW', timezone: 'Africa/Kigali', currencyCode: 'RWF' },
       });
       const member = await tx.organizationMember.create({ data: { organizationId: created.id, userId: owner.id } });
       await tx.memberRole.create({ data: { organizationId: created.id, memberId: member.id, roleId: role.id } });

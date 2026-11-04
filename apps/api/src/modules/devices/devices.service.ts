@@ -97,11 +97,13 @@ export class DevicesService {
   async register(input: { uniqueId: string; name?: string; variantId?: string; firmwareVersion?: string; serialNumber?: string; simIccid?: string; acknowledgedNoticeId?: string }): Promise<DeviceDto> {
     const orgId = this.ctx.organizationId;
     const isSimulated = input.uniqueId.startsWith('SIM-');
-    if (isSimulated) {
-      const org = await this.tenant.run((tx) => tx.organization.findUnique({ where: { id: orgId }, select: { isSandbox: true } }));
-      if (!this.env.SIMULATOR_ENABLED || !org?.isSandbox) {
-        throw new AppException('SIMULATED_DEVICE_NOT_ALLOWED', 422, 'Simulated devices can only be registered in a sandbox organization');
-      }
+    const org = await this.tenant.run((tx) => tx.organization.findUnique({ where: { id: orgId }, select: { isSandbox: true } }));
+    if (isSimulated && (!this.env.SIMULATOR_ENABLED || !org?.isSandbox)) {
+      throw new AppException('SIMULATED_DEVICE_NOT_ALLOWED', 422, 'Simulated devices can only be registered in a sandbox organization');
+    }
+    // A sandbox organization is where an unapproved provider works (and where demos live): nothing real may be registered in it.
+    if (!isSimulated && org?.isSandbox) {
+      throw new AppException('REAL_DEVICE_NOT_ALLOWED_IN_SANDBOX', 422, 'Real devices cannot be registered in a sandbox organization', 'Sandbox organizations are for simulated devices only. A real device needs a customer of an approved provider.');
     }
     // Customers may only pick listed models; the identifier must fit the model (IMEI check digit, simulator profile).
     const variant = input.variantId ? await this.prisma.gpsDeviceVariant.findFirst({ where: { id: input.variantId, model: { isListed: true } }, include: variantInclude }) : null;

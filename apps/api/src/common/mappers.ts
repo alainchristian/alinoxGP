@@ -13,6 +13,7 @@ export const toOrganizationDto = (o: Organization): OrganizationDto => ({
   status: o.status,
   isSandbox: o.isSandbox,
   parentOrganizationId: o.parentOrganizationId,
+  providerId: o.providerId,
 });
 
 export const isUuid = (v: unknown): v is string =>

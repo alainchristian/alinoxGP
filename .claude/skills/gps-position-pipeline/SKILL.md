@@ -15,7 +15,7 @@ Traccar WS ─► consumer (single leader) ─► normalize ─► validate ─�
    ─► emit to Socket.IO room org:<id> (coalesced) ─► enqueue evaluations (alert rules, dwell, security checks)
 ```
 
-Everything after "resolve tenant" carries `organizationId` and `vehicleId`.
+Everything after "resolve tenant" carries `providerId`, `organizationId` (the end customer) and `vehicleId`. Devices in provider stock with no assignment still update device health (visible to the provider) but produce no customer-facing state.
 
 ## 2. Normalization (done in the GPS-engine adapter)
 
@@ -54,29 +54,39 @@ Counts on the dashboard are computed from the same function — one definition, 
 
 ## 5. Latest state
 
-- Redis hash `org:{orgId}:vehicle:{vehicleId}:state` for fast reads (live map initial load, dashboard counts).
-- Postgres `vehicle_live_state` (one row per vehicle, upserted, throttled to e.g. once per 30 s per vehicle or on status change) so state survives Redis loss and is queryable.
+Design learned from M3. Each item fixed a measured bottleneck:
+
+- **The ingestion leader holds every vehicle's latest state in memory.** There is a single leader, so no Redis read is needed on the hot path.
+- **Redis** `org:{orgId}:vehicle:{vehicleId}:state` is written behind, in **batched pipelines** (~1 s). Every write is guarded by the **lease token** (e.g. a Lua script that checks the token first), so a leader that lost its lease cannot overwrite the new leader's data.
+- **A new leader warms up with one bulk read from Redis.** Never fall back to one database query per vehicle; that capped cold start at ~4 positions/s.
+- **Postgres `vehicle_live_state`** is saved every ~30 s (and on status change) with **one multi-row upsert** (e.g. `INSERT … SELECT FROM unnest(…) ON CONFLICT …`). Never write it row by row inside one long transaction; that timed out at ~1,000 vehicles.
+- **Cache lifetimes** (e.g. the device→tenant routing cache) come from configuration and must be **longer than the slowest normal reporting interval**. A 5 s TTL with 10 s reporting never hits. A test asserts this rule.
+- **Profile before optimising**, and never make writes fire-and-forget without a test proving no data is lost.
 - Initial page load: REST snapshot from latest state; then socket deltas. Clients merge by `fixTime` (ignore older deltas).
 
 ## 6. Real-time fan-out
 
-- Coalesce per organization: buffer deltas and flush ~1 s; only the newest state per vehicle in a flush.
+- Coalesce per organization: buffer deltas and flush ~1 s; only the newest state per vehicle in a flush. Emit each flush to the customer room `org:<customerId>` and to the provider room `provider:<providerId>` (see `gps-tenant-isolation` §5).
 - Delta payload: `{ vehicleId, lat, lon, speedKmh, heading, status, ignition, lastFixAt, lastSeenAt, alertActive, simulated }`.
 - Socket.IO with the Redis adapter so multiple API instances share rooms. Authorization per `gps-tenant-isolation`.
 - Clients that request a single vehicle (detail view, follow mode) can join `org:<id>:vehicle:<vehicleId>` for unthrottled updates.
 
 ## 7. Offline detection
 
-Traccar's `deviceOffline` event is a hint, not the authority. A BullMQ repeatable job (every minute) scans latest state for vehicles crossing the offline threshold, updates status, emits deltas and raises the "device offline" alert (with cooldown).
+Traccar's `deviceOffline` event is a hint, not the authority. Keep a Redis **sorted set whose score is each vehicle's offline deadline** (last seen + that vehicle's own threshold); update it on every position. A repeatable job (every 15–60 s) runs one `ZRANGEBYSCORE … -inf now` to find vehicles past their deadline. It then updates status, emits deltas, raises the "device offline" alert (with cooldown) and closes the vehicle's `device_connectivity_periods` row. Never scan the whole state hash (`HGETALL`).
+
+**Governed vehicles** (speed governors, rev. 1.2) report every ≤ 5 s, and all their records are retained for compliance. Violation, tamper and connectivity-period logic is described in `gps-speed-governor-compliance`. 1,000 governed vehicles ≈ 200 positions/s, which is the M3b target.
 
 ## 8. Alert evaluation
 
 - Rule types map to spec Module 11: overspeed (threshold, minimum duration), ignition on/off (optionally within a schedule — "unauthorized movement" = movement/ignition outside allowed hours or while immobilized), geofence enter/exit/dwell, device offline, external power cut, low battery, SOS, towing, immobilization events.
 - Sources: Traccar events (`alarm`, `ignitionOn`, `geofenceEnter`, …) and our own evaluation of positions (overspeed with duration, schedules).
-- Each alert: persisted in `alerts` (org, vehicle, type, severity, started/ended, position snapshot, acknowledged by/at), deduplicated with a per-rule cooldown, then a notification job is enqueued (see `gps-provider-adapters`).
+- Each alert: persisted in `alerts` (org, vehicle, type, severity, started/ended, position snapshot, acknowledged by/at), deduplicated with a per-rule cooldown, then a notification job is enqueued (see `gps-external-integrations`). Recipients can be the end customer's users and, for operational alerts, the provider's staff.
 - Only fire for capabilities the device actually has (catalogue). No "low battery" rule offered for a device that does not report battery.
 
-## 9. Storage strategy (default — confirm with an ADR in Phase 0/M3)
+## 9. Storage strategy (default — ADR written in M3a, confirmed or amended by the M3b scale proof in M11)
+
+Speed-governor records (5 s, retained per RURA, spec B14) are the most likely reason to revisit "raw positions only in Traccar": compliance queries over months of governed-vehicle data may need our own partitioned store. Decide in the M3b ADR review.
 
 **Raw positions stay in Traccar's database.** Our database stores only what we own or need to query fast:
 
@@ -101,7 +111,7 @@ Then: ingest from the pipeline into a `positions` table range-partitioned by mon
 
 ## 10. History queries
 
-- Always: tenant check → clip range to assignment windows (`gps-tenant-isolation` §5) → clip to `history_days` entitlement → max span per request → call engine.
+- Always: tenant check → clip range to assignment windows (`gps-tenant-isolation` §5) → clip to the effective `history_days` entitlement (provider plan ∩ customer limit) → max span per request → call engine.
 - Return positions in fix-time order; mark invalid/delayed points so playback can skip or style them.
 
 ## 11. Simulated data

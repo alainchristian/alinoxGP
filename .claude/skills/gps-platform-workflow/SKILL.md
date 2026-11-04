@@ -1,9 +1,11 @@
 ---
 name: gps-platform-workflow
-description: Operating manual for the GPS tracking / fleet management SaaS repo (React + NestJS + Prisma + PostgreSQL + Redis/BullMQ + Traccar). Use at the start of every work session in this repository, before starting any milestone or module, when the user says "continue", "start milestone N", "build module X", "what's next", or when deciding where new code, docs or decisions belong. It defines the architecture boundaries, directory layout, module workflow, milestone gating and which other gps-* skill to load.
+description: Operating manual for the GPS tracking / fleet management SaaS repo — a platform sold to GPS tracking providers who serve their own end customers (React + NestJS + Prisma + PostgreSQL + Redis/BullMQ + Traccar). Use at the start of every work session in this repository, before starting any milestone or module, when the user says "continue", "start milestone N", "build module X", "what's next", or when deciding where new code, docs or decisions belong. It defines the architecture boundaries, directory layout, module workflow, milestone gating and which other gps-* skill to load.
 ---
 
 # GPS platform — how work is done in this repo
+
+**What we are building:** a tracking platform that **GPS tracking providers** subscribe to (per active device), to serve and track their own end customers' vehicles under the provider's brand. Three tenant levels: platform → provider → end customer. Read `gps-provider-model` before any feature that involves customers, billing or branding.
 
 The requirements live in `docs/PROJECT_SPEC.md`. Read the sections relevant to the task before writing code; this skill tells you *how* to work, the spec tells you *what* to build. If the two ever disagree, the spec wins and the skill should be corrected.
 
@@ -34,14 +36,16 @@ Boundaries that must never be crossed — they exist because each one protects t
 │   ├── api/                 NestJS
 │   │   ├── prisma/          schema.prisma, migrations/, seed.ts
 │   │   └── src/
-│   │       ├── modules/     auth, organizations, users, access-control, vehicles, drivers,
-│   │       │                devices, device-catalogue, onboarding, installations, tracking,
-│   │       │                trips, geofences, alerts, notifications, security, reports,
-│   │       │                billing, customers, resellers, audit, platform-settings
-│   │       ├── integrations/ gps-engine/{port.ts,traccar/}, maps/, payments/, messaging/
+│   │       ├── modules/     auth, organizations, users, access-control, providers, branding,
+│   │       │                customers, vehicles, drivers, devices, device-catalogue, onboarding,
+│   │       │                installations, tracking, trips, geofences, alerts, notifications,
+│   │       │                security, reports, billing (provider usage + invoices), audit,
+│   │       │                platform-settings
+│   │       ├── integrations/ gps-engine/{port.ts,traccar/}, maps/, payments/, messaging/  (gateways)
 │   │       ├── infrastructure/ prisma/, redis/, queues/, websocket/, config/
 │   │       └── common/      guards, decorators, filters, interceptors, pagination
-│   ├── web/                 React + Vite (src/app, src/features/<module>, src/components, src/lib)
+│   ├── web/                 React + Vite (src/shells/{customer,provider,admin}, src/features/<module>,
+│   │                        src/components, src/theme (branding), src/lib)
 │   └── simulator/           GPS simulator CLI + scenarios + routes
 ├── packages/
 │   ├── shared/              zod schemas, DTO types, permission keys, enums (used by api AND web)
@@ -70,7 +74,13 @@ Write steps 1–7 into the module README (or `docs/`) **before** coding; they ar
 
 ## 5. Milestones and gating
 
-Order is fixed by spec §17.4: Phase 0 → M1 Foundation → M2 Traccar + device registration → M3 Simulator + ingestion → M4 Live tracking → M5 Vehicles, catalogue, onboarding → M6 Trips, playback, geofences → M7 Safe immobilization → M8 Notifications, reports → M9 Installations, billing, resellers → M10 Production.
+Order is fixed by spec §17.4 (revision 1.2): Phase 0 → M1 Foundation + provider hierarchy (registration, approval, customers, invitations, basic branding) → M2 Traccar + provider device registration → M3a Simulator + ingestion (correctness) → M4 Live tracking (customer and provider maps, MapLibre + OpenFreeMap) → M5 Vehicles, catalogue (incl. speed-governor device type), device onboarding, provider console → M6 Trips, playback, geofences → M7 Safe immobilization → M8 Notifications, reports → **M9 Speed governor compliance** → M10 Installations, provider billing, platform admin → M11 Scale proof (M3b) + production.
+
+Milestone numbers changed on 4 Nov 2026 (old M9 → M10, old M10 → M11). If `docs/DEVELOPMENT_ROADMAP.md` still uses the old numbers, update it first. M9 may move ahead of M7 if a speed-governor supplier is the first committed customer. That is the owner's decision; record it in the roadmap.
+
+Keep milestones small. If one bundles independent pieces (correctness, real-time, scenarios, scale proof), split it before starting and say so. M3 stalled because it bundled four pieces of work.
+
+The three-level tenancy is built in M1, not retrofitted later — every table from the first migration carries `organization_id` and `provider_id`.
 
 At the end of each milestone:
 
@@ -98,8 +108,12 @@ Within a milestone, keep going without asking permission for routine decisions; 
 | Simulator, scenarios, load tests | `gps-simulator` |
 | Device catalogue, capabilities, onboarding, activation, assignments, inventory, installations | `gps-device-catalogue` |
 | Immobilization, restoration, any device command | `gps-immobilization-safety` |
-| Payments, email/SMS/WhatsApp, maps/geocoding, webhooks | `gps-provider-adapters` |
+| GPS providers: registration, approval, customers, branding, staff scopes, active-device billing | `gps-provider-model` |
+| Payment gateways, email/SMS/WhatsApp, maps/geocoding, webhooks, regulator transmission | `gps-external-integrations` |
+| Speed governors, governed vehicles, violations, tamper, inspections, quarterly reports, Regulator portal | `gps-speed-governor-compliance` |
 | Any page, component, map, chart | `gps-fleet-ui` |
 | Before saying anything is done | `gps-done-check` |
 
-Several usually apply at once (e.g. a new "geofences" endpoint needs api-conventions + tenant-isolation + rbac + traccar-integration).
+Several usually apply at once (e.g. a new "geofences" endpoint needs api-conventions + tenant-isolation + rbac + traccar-integration; a provider-console page needs provider-model + fleet-ui + rbac).
+
+Vocabulary: "provider" always means a GPS tracking provider. External services are "gateways"/"integrations".

@@ -3,6 +3,7 @@ import type { AlertDto, VehicleDeltaDto } from '@gps/shared';
 import Redis from 'ioredis';
 import { ENV, type Env } from '../../infrastructure/config/env';
 import { REDIS } from '../../infrastructure/redis/redis.module';
+import { ProviderDirectory } from './provider-directory.service';
 import { ENGINE_STATUS_KEY, RealtimeGateway } from './realtime.gateway';
 
 /**
@@ -21,6 +22,7 @@ export class FanoutService implements OnModuleInit, OnApplicationShutdown {
     private readonly gateway: RealtimeGateway,
     @Inject(ENV) private readonly env: Env,
     @Inject(REDIS) private readonly redis: Redis,
+    private readonly providers: ProviderDirectory,
   ) {}
 
   onModuleInit() {
@@ -48,6 +50,8 @@ export class FanoutService implements OnModuleInit, OnApplicationShutdown {
 
   emitAlert(orgId: string, alert: AlertDto) {
     this.gateway.emitToOrg(orgId, 'alert:new', alert);
+    const providerId = this.providers.providerOf(orgId);
+    if (providerId) this.gateway.emitToProvider(providerId, 'alert:new', alert);
   }
 
   emitEngineStatus(connected: boolean) {
@@ -64,6 +68,8 @@ export class FanoutService implements OnModuleInit, OnApplicationShutdown {
       this.counters.batchesSent++;
       this.counters.deltasSent += batch.length;
       this.gateway.emitToOrg(orgId, 'vehicle:delta', { vehicles: batch });
+      const providerId = this.providers.providerOf(orgId);
+      if (providerId) this.gateway.emitToProvider(providerId, 'vehicle:delta', { vehicles: batch });
     }
     this.pending.clear();
   }
