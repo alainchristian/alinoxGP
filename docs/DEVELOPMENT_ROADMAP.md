@@ -14,8 +14,18 @@ Phase 0 deliverable — 2026-11-01 — aligned with spec §17.4 (milestones are 
 | M4 — Live tracking | **Approved by the owner (2026-11-02)** with the open development map; the Mapbox renderer waits for a token (OQ-034). See "M4 as built". |
 | **M5a — Vehicles, drivers, categories, documents, real dashboard** | **Approved by the owner (2026-11-02)** after the status counts and latest alerts were added to the dashboard. See "M5a as built". |
 | **M5b — Device catalogue, capabilities, onboarding, diagnostics, consent records** | **In progress (started 2026-11-02, after M5a approval).** Original note:  (owner split M5 on 2026-11-02; needs the physical test devices and OQ-018 / OQ-020 / OQ-024; starts after M5a is approved) |
-| **M1b — Provider hierarchy retrofit** | **Implemented and verified with the simulator (2026-11-04); awaiting owner review.** Slices 1–4 done, slice 5 (isolation proof) done for everything that exists. See "M1b as built". Provider-wide live map UI deferred (OQ-040). |
-| M6 – M11 | Not started (**milestone numbers changed on 2026-11-04**: new M9 = speed governor compliance; old M9 → M10 installations/provider billing/platform admin; old M10 → M11 scale proof (M3b) + production) |
+| **M1b — Provider hierarchy retrofit** | **Approved by the owner (2026-11-04), committed 4e50a87.** Slices 1–4 done, slice 5 (isolation proof) done for everything that exists. See "M1b as built". Provider-wide live map UI deferred (OQ-040). |
+| M5b (above) | **Approved by the owner (2026-11-04).** |
+| **M6 — Trips, playback, geofencing** | **Started 2026-11-04 — proposed split M6a (trips and playback) / M6b (geofences); waiting for the owner to confirm the split.** See "M6 plan". |
+| M7 – M11 (**milestone numbers changed on 2026-11-04**: new M9 = speed governor compliance; old M9 → M10 installations/provider billing/platform admin; old M10 → M11 scale proof (M3b) + production) |
+
+### M6 plan (2026-11-04) — trips, playback, geofencing (proposed split)
+
+M6 bundles two independent pieces (history through the engine; geofences synced to the engine with events), so it is proposed as two milestones, as M3 and M5 were.
+**M6a — Trips and playback.** History is read through the `GpsEnginePort` (Traccar reports: route, trips, stops), never copied (ADR-0004; scale unproven until M3b, so every query is bounded). Every history query is clipped to the device **assignment windows** of the vehicle (a device moved to another customer never reveals the other tenant's movements; a provider sees the periods the device was under it), to a configured **maximum span** and to the **history period** (a configuration value until plans arrive in M10). Invalid and delayed points are marked, not drawn as jumps. API: trips list (start/end place if available, times, distance, max/average speed, stops and idle periods), route points for playback. Web: Trips & Playback page (vehicle + date range, trip list, map route, play/pause/stop/speed/timeline, statistics). Provider staff reading a customer's history are written to the customer's access log (already generic). Needs **recorded Traccar report fixtures** from the real container (OQ: report latency vs dataset size stays with M3b).
+**M6b — Geofences.** Circle and polygon geofences, named locations (CRUD, tenant-scoped, vehicle assignment), WKT conversion (**latitude first**, tested), sync to the engine with reconciliation, enter/exit events from the engine into alerts (existing alert pipeline), dwell (native or delayed jobs, OQ-007), geofence notification **rules** stored and shown in-app (delivery channels arrive in M8). Simulator `geofence-enter-exit` scenario already exists.
+**Exit:** replay a simulator trip; receive geofence events from scenarios; reassignment test (A→B history windows).
+**Decisions needed from the owner:** (1) confirm the split; (2) the default history period until plans exist (proposed: 30 days) and the maximum span of one request (proposed: 7 days for route points, 31 days for trip lists).
 
 ### M1b plan (2026-11-04) — provider hierarchy retrofit
 
